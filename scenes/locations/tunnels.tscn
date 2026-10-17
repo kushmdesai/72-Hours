@@ -75,9 +75,9 @@ color = Color(1, 0.85, 0.5, 1)
 
 [node name="BaseLadder" type="Node2D" parent="." unique_id=1286630178 groups=["hatches"]]
 position = Vector2(144, 0)
-metadata/target = "res://scenes/locations/base.tscn"
+metadata/target = "res://scenes/locations/landing_pad.tscn"
 metadata/arrive = "TunnelHatch"
-metadata/label = "Ladder up to the Moonbase"
+metadata/label = "Ladder up to the Landing Pad"
 metadata/action = "climb up"
 
 [node name="Ladder" type="Node2D" parent="BaseLadder"]
@@ -176,7 +176,7 @@ offset_top = -150.0
 offset_right = 120.0
 offset_bottom = -126.0
 theme_override_font_sizes/font_size = 16
-text = "▲ MOONBASE"
+text = "▲ LANDING PAD"
 horizontal_alignment = 1
 
 [node name="IceVeins" type="Node2D" parent="." unique_id=1002873911]

@@ -70,3 +70,59 @@ offset_bottom = -52.0
 theme_override_font_sizes/font_size = 16
 text = "← BASE"
 horizontal_alignment = 1
+
+[node name="TunnelHatch" type="Node2D" parent="." unique_id=1650378245 groups=["hatches"]]
+position = Vector2(1008, 0)
+metadata/target = "res://scenes/locations/tunnels.tscn"
+metadata/arrive = "BaseLadder"
+metadata/label = "Hatch to the Ice Tunnels"
+metadata/action = "climb down"
+
+[node name="FrameLeft" type="ColorRect" parent="TunnelHatch" unique_id=1309745562]
+offset_left = -30.0
+offset_top = -84.0
+offset_right = -24.0
+mouse_filter = 2
+color = Color(0.5, 0.5, 0.55, 1)
+
+[node name="FrameRight" type="ColorRect" parent="TunnelHatch" unique_id=1309745563]
+offset_left = 24.0
+offset_top = -84.0
+offset_right = 30.0
+mouse_filter = 2
+color = Color(0.5, 0.5, 0.55, 1)
+
+[node name="FrameTop" type="ColorRect" parent="TunnelHatch" unique_id=1309745564]
+offset_left = -34.0
+offset_top = -90.0
+offset_right = 34.0
+offset_bottom = -84.0
+mouse_filter = 2
+color = Color(0.85, 0.7, 0.2, 1)
+
+[node name="Rim" type="ColorRect" parent="TunnelHatch" unique_id=1209745561]
+z_index = 1
+offset_left = -26.0
+offset_top = -4.0
+offset_right = 26.0
+offset_bottom = 4.0
+mouse_filter = 2
+color = Color(0.85, 0.7, 0.2, 1)
+
+[node name="Lid" type="ColorRect" parent="TunnelHatch" unique_id=1873945121]
+z_index = 1
+offset_left = -20.0
+offset_top = -3.0
+offset_right = 20.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(0.2, 0.22, 0.25, 1)
+
+[node name="Sign" type="Label" parent="TunnelHatch" unique_id=744129609]
+offset_left = -120.0
+offset_top = -130.0
+offset_right = 120.0
+offset_bottom = -106.0
+theme_override_font_sizes/font_size = 14
+text = "▼ ICE TUNNELS"
+horizontal_alignment = 1
