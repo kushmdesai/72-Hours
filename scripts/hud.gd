@@ -68,7 +68,7 @@ var _mission_bar: RangeBar
 var _rescue_label: Label
 var _survive_label: Label
 var _verdict_label: Label
-var _limiting_label: Label
+var _clock_panel: PanelContainer
 var _systems_panel: PanelContainer
 var _net_label: Label
 var _sun_label: Label
@@ -179,28 +179,28 @@ func _refresh() -> void:
 		if not is_inf(survive) and limiting == "" and time_until_empty(key) == survive:
 			limiting = key
 
-	_clock_label.text = "HOUR %d of %d" % [int(hours_elapsed), int(rescue_hours)]
+	_clock_label.text = "HOUR %d / %d" % [int(hours_elapsed), int(rescue_hours)]
 	_mission_bar.set_range(0.0, rescue_hours)
 	_mission_bar.value = hours_elapsed
 	_mission_bar.fill_color = COLOR_OK
-	_rescue_label.text = "Rescue ship in  %s" % _fmt_hours(rescue)
+	_rescue_label.text = "Rescue in %s" % _fmt_hours(rescue)
 
 	var color := _status_color(survive, rescue)
-	_survive_label.text = "You last  " + ("∞" if is_inf(survive) else _fmt_hours(survive))
+	_survive_label.text = "∞" if is_inf(survive) else _fmt_hours(survive)
 	_survive_label.add_theme_color_override("font_color", color)
 	# Flash the survival clock when the end is close.
 	_survive_label.modulate.a = 0.45 if survive < 3.0 and _blink > 0.6 else 1.0
+	_set_border(_clock_panel, color)
+	var verdict := ""
 	if is_inf(survive) or survive >= rescue:
-		_verdict_label.text = "On track to be rescued" if is_inf(survive) \
-				else "On track: %s to spare" % _fmt_hours(survive - rescue)
+		verdict = "on track" if is_inf(survive) else "%s to spare" % _fmt_hours(survive - rescue)
 	else:
-		_verdict_label.text = "Not enough: %s short" % _fmt_hours(rescue - survive)
-	_verdict_label.add_theme_color_override("font_color", color)
+		verdict = "%s short" % _fmt_hours(rescue - survive)
 	if limiting != "":
-		_limiting_label.text = "%s will hit its %s first" % [
-			CONFIG[limiting].label, "max" if heading_to_max(limiting) else "min"]
-	else:
-		_limiting_label.text = ""
+		verdict += "  ·  %s %s first" % [CONFIG[limiting].label.to_lower(),
+				"max" if heading_to_max(limiting) else "min"]
+	_verdict_label.text = verdict
+	_verdict_label.add_theme_color_override("font_color", color)
 
 	_refresh_systems()
 
@@ -221,14 +221,14 @@ func _refresh_row(key: String, rescue: float) -> void:
 	var color := _status_color(t, rescue)
 	bar.value = value
 	bar.fill_color = color
+	_set_border(row.panel, color)
 	row.value.text = (cfg.fmt + " %s") % [value, cfg.unit]
-	var arrow := "↑" if rate > 0.0 else ("↓" if rate < 0.0 else "")
+	var arrow := "↑" if rate > 0.0 else ("↓" if rate < 0.0 else "→")
 	row.rate.text = "%s %s/h" % [arrow, _fmt_rate(absf(rate))]
-	row.rate.add_theme_color_override("font_color", COLOR_DIM if absf(rate) < 1e-6 else Color.WHITE)
 	if is_inf(t):
 		row.limit.text = "safe"
 	else:
-		row.limit.text = "%s in %s" % ["max" if heading_to_max(key) else "min", _fmt_hours(t)]
+		row.limit.text = "%s %s" % ["max" if heading_to_max(key) else "min", _fmt_hours(t)]
 	row.limit.add_theme_color_override("font_color", color)
 
 
@@ -271,20 +271,21 @@ func _refresh_systems() -> void:
 			active = running
 		row.power.text = power
 		row.power.add_theme_color_override("font_color", Color.WHITE if active else COLOR_OFF)
+		row.name.add_theme_color_override("font_color", Color.WHITE if on else COLOR_OFF)
 
 	var net: float = _base.solar_power() - _base.power_draw()
-	_net_label.text = "Net power  %+.1f kW" % net
+	_net_label.text = "net %+.1f kW" % net
 	_net_label.add_theme_color_override("font_color", COLOR_GOOD if net >= 0.0 else COLOR_WARN)
 
 	var length: float = cfg.day_length
 	var frac := fposmod((hours_elapsed + cfg.day_phase) / length, 1.0)
 	var outside: float = _base.outside_temperature()
 	if frac < 0.5:
-		_sun_label.text = "☀ Day: sunset in %s   Outside %d °C" % [
+		_sun_label.text = "☀ Day · sunset in %s · outside %d °C" % [
 			_fmt_hours((0.5 - frac) * length), int(round(outside))]
 		_sun_label.add_theme_color_override("font_color", COLOR_WARN)
 	else:
-		_sun_label.text = "☾ Night: sunrise in %s   Outside %d °C" % [
+		_sun_label.text = "☾ Night · sunrise in %s · outside %d °C" % [
 			_fmt_hours((1.0 - frac) * length), int(round(outside))]
 		_sun_label.add_theme_color_override("font_color", COLOR_OK)
 
@@ -292,7 +293,7 @@ func _refresh_systems() -> void:
 	if hours_elapsed < cfg.failure_grace_hours:
 		_risk_label.text = "No breakdowns for %s" % _fmt_hours(cfg.failure_grace_hours - hours_elapsed)
 	else:
-		_risk_label.text = "Breakdown risk next hour  %d%%" % int(round(risk * 100.0))
+		_risk_label.text = "Breakdown risk %d%% per hour" % int(round(risk * 100.0))
 
 
 ## Red when it hits a limit before rescue, amber when the margin is under 25%.
@@ -318,110 +319,141 @@ func _fmt_rate(r: float) -> String:
 
 
 func _build() -> void:
-	# Resources, top left.
-	var panel := _panel()
-	panel.position = Vector2(12, 12)
-	add_child(panel)
-	var grid := GridContainer.new()
-	grid.columns = 5
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 4)
-	panel.add_child(grid)
-	for header in ["", "Safe range  (min to max)", "Now", "Rate", "Limit in"]:
-		grid.add_child(_label(header, 11, COLOR_DIM))
+	# Top strip: one card per resource, then the survival card.
+	var strip := HBoxContainer.new()
+	strip.anchor_right = 1.0
+	strip.offset_left = 10
+	strip.offset_right = -10
+	strip.offset_top = 10
+	strip.add_theme_constant_override("separation", 6)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(strip)
 	for key in RESOURCES:
 		var cfg: Dictionary = CONFIG[key]
+		var card := _panel()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		strip.add_child(card)
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 0)
+		card.add_child(v)
 		var bar := RangeBar.new()
-		bar.custom_minimum_size = Vector2(200, 20)
+		bar.custom_minimum_size = Vector2(0, 16)
 		bar.show_limits = true
 		bar.capped = cfg.get("capped", false)
 		var row := {
+			"panel": card,
 			"bar": bar,
-			"value": _label("", 15, Color.WHITE, 78),
-			"rate": _label("", 12, Color.WHITE, 72),
-			"limit": _label("", 14, COLOR_GOOD, 96),
+			"value": _label("", 15, Color.WHITE),
+			"rate": _label("", 11, COLOR_DIM),
+			"limit": _label("", 12, COLOR_GOOD),
 		}
-		grid.add_child(_label(cfg.label, 15, Color.WHITE, 52))
-		grid.add_child(bar)
-		grid.add_child(row.value)
-		grid.add_child(row.rate)
-		grid.add_child(row.limit)
+		v.add_child(_pair(_label(cfg.label.to_upper(), 11, COLOR_DIM), row.value))
+		v.add_child(bar)
+		v.add_child(_pair(row.rate, row.limit))
 		_rows[key] = row
 
-	# Survival vs rescue, top right.
-	var clock := _panel()
-	clock.anchor_left = 1.0
-	clock.anchor_right = 1.0
-	clock.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	clock.offset_right = -12
-	clock.offset_top = 12
-	add_child(clock)
+	_clock_panel = _panel()
+	_clock_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_clock_panel.size_flags_stretch_ratio = 1.5
+	strip.add_child(_clock_panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
-	clock.add_child(box)
-	_clock_label = _label("", 12, COLOR_DIM)
+	box.add_theme_constant_override("separation", 0)
+	_clock_panel.add_child(box)
+	_clock_label = _label("", 11, COLOR_DIM)
+	_rescue_label = _label("", 12, Color.WHITE)
+	box.add_child(_pair(_clock_label, _rescue_label))
 	_mission_bar = RangeBar.new()
-	_mission_bar.custom_minimum_size = Vector2(230, 8)
-	_rescue_label = _label("", 15, Color.WHITE)
-	_survive_label = _label("", 24, COLOR_GOOD)
-	_verdict_label = _label("", 14, COLOR_GOOD)
-	_limiting_label = _label("", 12, COLOR_DIM)
-	for c in [_clock_label, _mission_bar, _rescue_label, _survive_label, _verdict_label, _limiting_label]:
-		if c is Label:
-			c.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		box.add_child(c)
+	_mission_bar.custom_minimum_size = Vector2(0, 4)
+	box.add_child(_mission_bar)
+	_survive_label = _label("", 20, COLOR_GOOD)
+	box.add_child(_pair(_label("YOU LAST", 11, COLOR_DIM), _survive_label))
+	_verdict_label = _label("", 11, COLOR_GOOD)
+	_verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	box.add_child(_verdict_label)
+
+	# Controls: one quiet line under the strip, right side.
+	var keys := _label("A/D move  ·  W jump  ·  E console (hold: repair)  ·  F fast-forward", 11, COLOR_DIM)
+	keys.anchor_left = 1.0
+	keys.anchor_right = 1.0
+	keys.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	keys.offset_right = -14
+	keys.offset_top = 92
+	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	keys.add_theme_color_override("font_outline_color", Color.BLACK)
+	keys.add_theme_constant_override("outline_size", 3)
+	add_child(keys)
 
 	# Systems and power, bottom left.
 	_systems_panel = _panel()
 	_systems_panel.anchor_top = 1.0
 	_systems_panel.anchor_bottom = 1.0
 	_systems_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_systems_panel.offset_left = 12
-	_systems_panel.offset_bottom = -12
+	_systems_panel.offset_left = 10
+	_systems_panel.offset_bottom = -10
 	add_child(_systems_panel)
 	var sbox := VBoxContainer.new()
-	sbox.add_theme_constant_override("separation", 2)
+	sbox.add_theme_constant_override("separation", 1)
 	_systems_panel.add_child(sbox)
-	sbox.add_child(_label("SYSTEMS  (press E at a console to open it)", 11, COLOR_DIM))
+	_net_label = _label("", 11, COLOR_GOOD)
+	sbox.add_child(_pair(_label("SYSTEMS", 11, COLOR_DIM), _net_label))
 	var sgrid := GridContainer.new()
 	sgrid.columns = 3
-	sgrid.add_theme_constant_override("h_separation", 12)
-	sgrid.add_theme_constant_override("v_separation", 0)
+	sgrid.add_theme_constant_override("h_separation", 10)
+	sgrid.add_theme_constant_override("v_separation", -2)
 	sbox.add_child(sgrid)
 	for system: String in SYSTEMS:
 		var row := {
-			"state": _label("", 13, COLOR_GOOD, 58),
-			"power": _label("", 13, Color.WHITE, 70),
+			"name": _label(SYSTEMS[system], 12, Color.WHITE, 100),
+			"state": _label("", 11, COLOR_GOOD, 48),
+			"power": _label("", 12, Color.WHITE, 58),
 		}
-		sgrid.add_child(_label(SYSTEMS[system], 13, Color.WHITE, 104))
+		row.power.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		sgrid.add_child(row.name)
 		sgrid.add_child(row.state)
 		sgrid.add_child(row.power)
-		row.power.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_system_rows[system] = row
-	_net_label = _label("", 13, COLOR_GOOD)
-	_sun_label = _label("", 13, COLOR_WARN)
-	_risk_label = _label("", 12, COLOR_DIM)
-	for l in [_net_label, _sun_label, _risk_label]:
-		sbox.add_child(l)
+	sbox.add_child(HSeparator.new())
+	_sun_label = _label("", 11, COLOR_WARN)
+	_risk_label = _label("", 11, COLOR_DIM)
+	sbox.add_child(_sun_label)
+	sbox.add_child(_risk_label)
 
-	# Controls, under the rescue clock (clear of the alarms along the bottom).
-	var keys := _label("A/D move   W jump   F fast-forward\nE open console / hold to repair", 11, COLOR_DIM)
-	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	box.add_child(HSeparator.new())
-	box.add_child(keys)
+
+## Two labels on one line: the first on the left, the second pushed right.
+func _pair(left: Label, right: Label) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	right.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h.add_child(left)
+	h.add_child(right)
+	return h
 
 
 func _panel() -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.02, 0.04, 0.08, 0.8)
-	style.border_color = Color(0.45, 0.85, 1.0, 0.35)
-	style.set_border_width_all(1)
+	style.bg_color = Color(0.02, 0.04, 0.08, 0.82)
+	style.border_color = Color(0.45, 0.85, 1.0, 0.3)
+	style.border_width_left = 3
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
 	style.set_corner_radius_all(4)
-	style.set_content_margin_all(8)
+	style.content_margin_left = 8
+	style.content_margin_right = 7
+	style.content_margin_top = 4
+	style.content_margin_bottom = 5
 	panel.add_theme_stylebox_override("panel", style)
 	return panel
+
+
+## Colour a card's left edge (and faintly its outline) by status.
+func _set_border(panel: PanelContainer, color: Color) -> void:
+	var style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+	style.border_color = Color(color, 0.75)
 
 
 func _label(text: String, size: int, color: Color, min_width: float = 0.0) -> Label:
@@ -438,7 +470,7 @@ func _label(text: String, size: int, color: Color, min_width: float = 0.0) -> La
 ## min and max are written at either end and the last 15% of the range at each
 ## end is tinted red as the danger zone.
 class RangeBar extends Control:
-	const LIMIT_W := 34.0
+	const LIMIT_W := 24.0
 	var min_value := 0.0
 	var max_value := 1.0
 	var value := 0.0:
