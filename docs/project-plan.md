@@ -41,7 +41,7 @@ Step-by-step build order. Each step ends with something playable, so the game st
 
 ## 8. Win and lose (basic version done)
 - An end panel names what ran out and when, or the win summary; R restarts.
-- Lose screen when any resource hits zero (or temperature falls below the safe limit), naming which one ran out and when.
+- Lose screen when any resource leaves its safe min–max range (`BaseConfig` "Safe ranges"), naming which one, whether it went too low or too high, and when.
 - Win screen at hour 72 with a summary.
 
 ## 9. Math explainer (for judges)

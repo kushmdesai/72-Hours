@@ -14,13 +14,26 @@ extends Resource
 
 @export_group("Starting values")
 @export var oxygen_start: float = 2.0
-@export var energy_start: float = 40.0
-## Battery size. Solar input beyond a full battery is wasted.
-@export var energy_capacity: float = 60.0
+@export var energy_start: float = 30.0
 @export var water_start: float = 30.0
 @export var temperature_start: float = 21.0
-## Lowest safe cabin temperature; reaching it ends the game like an empty tank.
+
+@export_group("Safe ranges")
+## Each resource must stay strictly between its min and max; touching either
+## limit ends the game.
+## Below the minimum the astronaut can't breathe; above the maximum the cabin
+## air is oxygen-rich enough to be a fire risk.
+@export var oxygen_min: float = 0.5
+@export var oxygen_max: float = 4.0
+## A flat battery shuts down life support; charging past capacity overheats it.
+@export var energy_min: float = 0.0
+@export var energy_max: float = 80.0
+## The tank holds 40 L, and nothing refills it, so only the minimum matters.
+@export var water_min: float = 0.0
+@export var water_max: float = 40.0
+## Too cold to live below the minimum, heat stroke above the maximum.
 @export var temperature_min: float = 5.0
+@export var temperature_max: float = 35.0
 
 @export_group("Oxygen  dO/dt = g*u_gen - c_O - L_O")
 ## g: oxygen generator output in kg/h while switched on.
