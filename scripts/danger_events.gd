@@ -3,8 +3,8 @@ extends Node
 ## Calamities that send the astronaut into the ice tunnels.
 ##
 ## Every so often a calamity arrives: a black hole sweeping past the Moon, or
-## an alien UFO raiding the base. They take turns (the first is picked at
-## random). The Control Panel in the Habitat switches to its danger screen
+## an alien UFO raiding the base, or an asteroid shower. They take turns in
+## that order (the first is picked at random). The Control Panel in the Habitat switches to its danger screen
 ## `warning_hours` before one arrives, and a banner counts down. While it lasts
 ## (`duration_hours`) the only safe place is the ice tunnels: anyone outside is
 ## pulled off the surface or abducted and the game ends. Either way the base is
@@ -50,7 +50,19 @@ const KINDS := {
 		"caught": "You were outside when the alien UFO raided the base at hour %.1f\nand were abducted.",
 		"tint": Color(0.1, 0.45, 0.15),
 	},
+	"asteroids": {
+		"name": "ASTEROID SHOWER",
+		"art": preload("res://assests/background/Pixelated Astroid (BIG).png"),
+		"passing": "hitting the surface",
+		# Impacts out on the surface and holes punched in the hull.
+		"damage": ["dust", "oxygen_leak", "water_leak", "blight"],
+		"caught": "You were outside when the asteroid shower hit at hour %.1f\nand were struck by a falling rock.",
+		"tint": Color(0.5, 0.2, 0.0),
+	},
 }
+## The calamities in the order they take turns.
+const ORDER := ["black_hole", "alien", "asteroids"]
+const ASTEROID_SMALL := preload("res://assests/background/Pixelated Astroid (SMALL).png")
 
 var phase := "calm"
 ## Which calamity is next (or happening): a key of KINDS.
@@ -66,6 +78,11 @@ var _banner: Label
 var _hole: TextureRect
 var _tint: ColorRect
 var _t := 0.0
+var _dt := 0.0
+## Asteroids streaking across the sky during an asteroid warning:
+## {node: TextureRect, velocity: Vector2}.
+var _meteors: Array[Dictionary] = []
+var _next_meteor := 0.0
 
 
 func _ready() -> void:
@@ -73,12 +90,13 @@ func _ready() -> void:
 	if not main:
 		main = get_parent()
 	arrive_hour = _rng.randf_range(first_hours.x, first_hours.y)
-	kind = KINDS.keys()[_rng.randi() % KINDS.size()]
+	kind = ORDER[_rng.randi() % ORDER.size()]
 	_build()
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	_dt = delta
 	if Base.ended:
 		_layer.visible = false
 		return
@@ -105,7 +123,7 @@ func _process(delta: float) -> void:
 				arrive_hour = h + _rng.randf_range(gap_hours.x, gap_hours.y)
 				passed.emit()
 				# The other calamity comes next.
-				kind = "alien" if kind == "black_hole" else "black_hole"
+				kind = ORDER[(ORDER.find(kind) + 1) % ORDER.size()]
 	_update_visuals()
 
 
@@ -193,6 +211,15 @@ func _update_visuals() -> void:
 				_hole.position = Vector2(lerpf(1100.0, 692.0, minf(k * 2.0, 1.0)), 50.0 + sin(_t * 2.0) * 8.0)
 				_hole.scale = Vector2.ONE * lerpf(0.8, 1.5, k)
 				_hole.rotation = sin(_t * 1.3) * 0.08
+			if kind == "asteroids":
+				# No single object in the sky: rocks streak past instead,
+				# more and more often as the shower gets close.
+				_hole.visible = false
+				if not sheltered():
+					_next_meteor -= _dt
+					if _next_meteor <= 0.0:
+						_spawn_meteor(k)
+						_next_meteor = lerpf(1.6, 0.25, k) * _rng.randf_range(0.6, 1.4)
 			_tint.visible = false
 		"active":
 			_banner.visible = true
@@ -202,6 +229,35 @@ func _update_visuals() -> void:
 			_hole.visible = false
 			_tint.visible = true
 			_tint.color = Color(KINDS[kind].tint, 0.12 + 0.05 * sin(_t * 3.0))
+	_move_meteors()
+
+
+func _spawn_meteor(k: float) -> void:
+	var big := _rng.randf() < lerpf(0.15, 0.5, k)
+	var m := TextureRect.new()
+	m.texture = KINDS.asteroids.art if big else ASTEROID_SMALL
+	m.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	m.size = m.texture.get_size()
+	m.scale = Vector2.ONE * _rng.randf_range(0.6, 1.1)
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.position = Vector2(_rng.randf_range(500.0, 1250.0), -90.0)
+	_layer.add_child(m)
+	# The art points down and to the left, so fly that way.
+	var speed := _rng.randf_range(420.0, 700.0)
+	_meteors.append({"node": m, "velocity": Vector2(-0.8, 0.6) * speed})
+
+
+func _move_meteors() -> void:
+	var out_of_sight := sheltered() or phase != "warning"
+	for m: Dictionary in _meteors:
+		var node: TextureRect = m.node
+		node.position += m.velocity * _dt
+		node.visible = not out_of_sight
+	var gone := _meteors.filter(func(m: Dictionary) -> bool:
+		return m.node.position.y > 700.0 or m.node.position.x < -150.0)
+	for m: Dictionary in gone:
+		m.node.queue_free()
+		_meteors.erase(m)
 
 
 func _build() -> void:
