@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://scripts/location.gd" id="1_y0000"]
 [ext_resource type="TileSet" path="res://assests/tiles/moon_tileset.tres" id="2_by8vd"]
+[ext_resource type="Script" path="res://scripts/rescue_rocket.gd" id="r_script"]
+[ext_resource type="Texture2D" path="res://assests/character/rocket_fire.png" id="r_fire"]
+[ext_resource type="Texture2D" path="res://assests/character/Pixelated Rocket (OFF).png" id="r_off"]
 
 [node name="LandingPad" type="Node2D" unique_id=1724174333]
 script = ExtResource("1_y0000")
@@ -13,6 +16,16 @@ z_index = -1
 texture_filter = 1
 tile_set = ExtResource("2_by8vd")
 collision_enabled = false
+
+[node name="RescueRocket" type="Sprite2D" parent="."]
+visible = false
+texture_filter = 1
+position = Vector2(640, -69)
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("r_off")
+script = ExtResource("r_script")
+fire_texture = ExtResource("r_fire")
+off_texture = ExtResource("r_off")
 
 [node name="Terrain" type="TileMapLayer" parent="." unique_id=701467801]
 texture_filter = 1
