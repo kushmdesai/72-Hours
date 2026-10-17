@@ -571,11 +571,12 @@ func _build_ui() -> void:
 	layer.add_child(_vignette)
 	layer.move_child(_vignette, 0)
 
-	# The end screen covers the whole window in black, with its contents centred.
+	# The end screen darkens the whole window (the frozen game shows through),
+	# with its contents centred.
 	_end_panel = PanelContainer.new()
 	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color.BLACK
+	style.bg_color = Color(0, 0, 0, 0.6)
 	_end_panel.add_theme_stylebox_override("panel", style)
 	_end_panel.visible = false
 	# Its own layer above the location-name overlay (10) so nothing covers it.
