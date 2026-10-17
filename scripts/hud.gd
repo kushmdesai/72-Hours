@@ -373,7 +373,7 @@ func _build() -> void:
 	var sbox := VBoxContainer.new()
 	sbox.add_theme_constant_override("separation", 2)
 	_systems_panel.add_child(sbox)
-	sbox.add_child(_label("SYSTEMS  (walk to a console, press E)", 11, COLOR_DIM))
+	sbox.add_child(_label("SYSTEMS  (press E at a console to open it)", 11, COLOR_DIM))
 	var sgrid := GridContainer.new()
 	sgrid.columns = 3
 	sgrid.add_theme_constant_override("h_separation", 12)
@@ -396,7 +396,7 @@ func _build() -> void:
 		sbox.add_child(l)
 
 	# Controls, bottom right.
-	var keys := _label("A/D move   W/Space jump   E switch / hold to repair", 12, COLOR_DIM)
+	var keys := _label("A/D move   W/Space jump   E open console / hold to repair", 12, COLOR_DIM)
 	keys.anchor_left = 1.0
 	keys.anchor_right = 1.0
 	keys.anchor_top = 1.0
