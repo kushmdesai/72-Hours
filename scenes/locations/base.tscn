@@ -14,6 +14,7 @@
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_on.png" id="12_oxygen_on"]
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_off.png" id="13_oxygen_off"]
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_broken.png" id="14_oxygen_broken"]
+[ext_resource type="Texture2D" path="res://assests/background/control_panel_normal.png" id="cp_normal"]
 
 [node name="Base" type="Node2D" unique_id=25766017]
 script = ExtResource("1_vsmf7")
@@ -168,6 +169,16 @@ offset_top = -20.0
 offset_right = -32.0
 mouse_filter = 2
 color = Color(0.55, 0.6, 0.7, 1)
+
+[node name="ControlPanel" type="Node2D" parent="Rooms/Habitat" groups=["control_panels"]]
+position = Vector2(70, 0)
+metadata/normal_texture = ExtResource("cp_normal")
+
+[node name="Screen" type="Sprite2D" parent="Rooms/Habitat/ControlPanel"]
+texture_filter = 1
+position = Vector2(0, -46.5)
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("cp_normal")
 
 [node name="EastAirlock" type="Node2D" parent="Rooms" unique_id=1695864458 groups=["rooms"]]
 position = Vector2(2496, 0)

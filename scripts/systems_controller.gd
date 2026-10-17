@@ -68,6 +68,7 @@ var _end_label: Label
 var _end_title: Label
 var _blink := 0.0
 var _drops: SupplyDrops
+var _dangers: DangerEvents
 var _toasts: Array[Dictionary] = []
 var _toast_label: Label
 var _speed_label: Label
@@ -91,6 +92,17 @@ func _ready() -> void:
 	_drops.pod_landed.connect(_on_pod_landed)
 	_drops.pod_collected.connect(_on_pod_collected)
 	_drops.pod_lost.connect(_on_pod_lost)
+	_dangers = DangerEvents.new()
+	_dangers.main = get_parent()
+	_dangers.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(_dangers)
+	_dangers.warning_started.connect(func() -> void:
+		_toast("Black hole coming! Shelter in the ice tunnels", Color(1.0, 0.55, 0.3)))
+	_dangers.arrived.connect(func() -> void:
+		_shake = 10.0)
+	_dangers.passed.connect(func() -> void:
+		_toast("The black hole has passed: repair the damaged machines", Color(0.6, 1.0, 0.6)))
+	_dangers.caught.connect(_on_caught_by_black_hole)
 	Base.failure_started.connect(_on_failure_started)
 	Base.failure_repaired.connect(_on_failure_repaired)
 	Base.game_over.connect(_on_game_over)
@@ -134,6 +146,12 @@ func _find_target() -> void:
 			best = d
 			_target = hatch
 			_target_site = "hatch"
+	for panel: Node2D in get_tree().get_nodes_in_group("control_panels"):
+		var d := absf(panel.global_position.x - _player.global_position.x)
+		if d < best:
+			best = d
+			_target = panel
+			_target_site = "control"
 	for vein: Node2D in get_tree().get_nodes_in_group("ice_veins"):
 		var d := absf(vein.global_position.x - _player.global_position.x)
 		if d < best:
@@ -157,6 +175,10 @@ func _handle_input(delta: float) -> void:
 		return
 	if _target_site == "ice":
 		_handle_drill(delta)
+		return
+	if _target_site == "control":
+		_repair_progress = 0.0
+		_show_prompt("CONTROL PANEL\n" + _dangers.status_text())
 		return
 	var site := "solar" if _target_site == "panel" else _target_site
 	var broken := Base.failures_at(site)
@@ -197,7 +219,7 @@ func _handle_input(delta: float) -> void:
 func _show_prompt(text: String) -> void:
 	_prompt.text = text
 	_prompt.visible = true
-	_prompt.global_position = _target.global_position + Vector2(-_prompt.size.x / 2.0, -110.0)
+	_prompt.global_position = _target.global_position + Vector2(-_prompt.size.x / 2.0, -95.0 - _prompt.size.y)
 
 
 ## Hold E at an ice vein in the tunnels to drill one load of water. Each load is
@@ -361,6 +383,8 @@ func _update_toasts(delta: float) -> void:
 	for t in _toasts:
 		lines.append(t.text)
 	_toast_label.text = "\n".join(lines)
+	# Make room for the black hole banner (DangerEvents) above the toasts.
+	_toast_label.offset_top = 212.0 if _dangers.in_danger() else 184.0
 	if not _toasts.is_empty():
 		_toast_label.add_theme_color_override("font_color", _toasts[-1].color)
 	# Point at waiting pods so the player knows where to go.
@@ -422,6 +446,12 @@ func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
 	_shake = 14.0
 	_show_end("%s at hour %.1f.\nThe rescue ship was %.1f hours away." % [
 		reason, hour, Base.hours_until_rescue()], false)
+
+
+func _on_caught_by_black_hole() -> void:
+	Base.ended = true
+	_shake = 18.0
+	_show_end("You were outside when the black hole passed at hour %.1f\nand were pulled off the Moon.\nShelter in the ice tunnels when the Control Panel warns you." % Base.hour, false)
 
 
 func _on_game_won() -> void:

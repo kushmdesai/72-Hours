@@ -60,3 +60,8 @@ Step-by-step build order. Each step ends with something playable, so the game st
 - Export builds (web export so judges can play in a browser).
 - Record a 1–2 minute demo video showing a decision changing the survival clock.
 - Final README and the project description in `docs/project-description.md`.
+
+## Black holes and the Control Panel
+- `scripts/danger_events.gd` (DangerEvents, run by the systems controller): a black hole passes every 16–22 in-game hours (first at hour 14–20). The Control Panel in the Habitat switches to its danger state 3 h before, a banner counts down and the black hole grows in the sky.
+- While it passes (2 h) the player must be in the ice tunnels, or the game ends. Its tides break every machine (dust, generator jam, water leak, heater fault, blight), so they need repairing after.
+- The Control Panel uses `control_panel_normal.png` (a see-through copy of the console art). Set `danger_texture` metadata on the ControlPanel node in `base.tscn` when the danger art is ready; until then it flashes red.
