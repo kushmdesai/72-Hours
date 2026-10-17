@@ -16,6 +16,9 @@
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_broken.png" id="14_oxygen_broken"]
 [ext_resource type="Texture2D" path="res://assests/background/control_panel_normal.png" id="cp_normal"]
 [ext_resource type="Texture2D" path="res://assests/background/control_panel_danger.png" id="cp_danger"]
+[ext_resource type="Script" path="res://scripts/airlock_door.gd" id="door_script"]
+[ext_resource type="Texture2D" path="res://assests/background/airlock_door_closed.png" id="door_closed"]
+[ext_resource type="Texture2D" path="res://assests/background/airlock_door_open.png" id="door_open"]
 
 [node name="Base" type="Node2D" unique_id=25766017]
 script = ExtResource("1_vsmf7")
@@ -50,6 +53,14 @@ offset_bottom = -160.8
 theme_override_font_sizes/font_size = 16
 text = "WEST AIRLOCK"
 horizontal_alignment = 1
+
+[node name="Door" type="Sprite2D" parent="Rooms/WestAirlock"]
+texture_filter = 1
+position = Vector2(58, -80)
+texture = ExtResource("door_closed")
+script = ExtResource("door_script")
+closed_texture = ExtResource("door_closed")
+open_texture = ExtResource("door_open")
 
 [node name="SolarControl" type="Node2D" parent="Rooms" unique_id=1058735545 groups=["rooms"]]
 position = Vector2(576, 0)
@@ -194,6 +205,14 @@ offset_bottom = -160.8
 theme_override_font_sizes/font_size = 16
 text = "EAST AIRLOCK"
 horizontal_alignment = 1
+
+[node name="Door" type="Sprite2D" parent="Rooms/EastAirlock"]
+texture_filter = 1
+position = Vector2(-58, -80)
+texture = ExtResource("door_closed")
+script = ExtResource("door_script")
+closed_texture = ExtResource("door_closed")
+open_texture = ExtResource("door_open")
 
 [node name="PlayerStart" type="Node2D" parent="." unique_id=2022751216]
 position = Vector2(2160, -32)
