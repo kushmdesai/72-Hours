@@ -7,11 +7,36 @@ extends Node2D
 ## or disconnects the panels, to stop a full battery overcharging. When something has failed, hold E
 ## at the console (or at any solar panel for dust) to repair it. Console screens
 ## show green = on, grey = off, flashing red = broken.
+##
+## It also runs the feel of the game: hold F to fast-forward quiet stretches,
+## supply pods to jump for (SupplyDrops), warnings with a hint when a resource
+## is heading out of its safe range, a red screen pulse and camera shake when
+## things go wrong, and a score with a saved best on the end screen.
 
 ## How close the player must stand to a console or panel, in pixels.
 @export var reach_px: float = 48.0
 ## Real seconds E must be held to finish a repair.
 @export var repair_seconds: float = 2.0
+## Clock multiplier while F is held.
+@export var fast_forward_scale: float = 6.0
+## Warn when a resource will leave its safe range within this many hours.
+@export var warning_hours: float = 3.0
+
+const BEST_PATH := "user://moonbase_best.cfg"
+## What to do about each resource heading too low / too high.
+const HINTS_LOW := {
+	"oxygen": "switch the oxygen generator on",
+	"energy": "switch systems off to save power",
+	"water": "switch the water recycler on",
+	"temperature": "switch the heater on",
+}
+const HINTS_HIGH := {
+	"oxygen": "switch the oxygen generator off",
+	"energy": "disconnect the solar panels at Solar Control",
+	"water": "use some water",
+	"temperature": "switch the heater off",
+}
+const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temperature"}
 
 const SYSTEM_LABELS := {
 	"solar": "solar panels",
@@ -33,6 +58,15 @@ var _alert: Label
 var _end_panel: PanelContainer
 var _end_label: Label
 var _blink := 0.0
+var _drops: SupplyDrops
+var _toasts: Array[Dictionary] = []
+var _toast_label: Label
+var _speed_label: Label
+var _vignette: TextureRect
+var _danger := false
+var _shake := 0.0
+var _ff_blocked := false
+var _repairs := 0
 
 
 func _ready() -> void:
@@ -40,6 +74,13 @@ func _ready() -> void:
 	_ensure_input_actions()
 	_player = get_parent().get_node("Player")
 	_build_ui()
+	_drops = SupplyDrops.new()
+	_drops.main = get_parent()
+	_drops.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(_drops)
+	_drops.pod_landed.connect(_on_pod_landed)
+	_drops.pod_collected.connect(_on_pod_collected)
+	_drops.pod_lost.connect(_on_pod_lost)
 	Base.failure_started.connect(_on_failure_started)
 	Base.failure_repaired.connect(_on_failure_repaired)
 	Base.game_over.connect(_on_game_over)
@@ -55,7 +96,10 @@ func _process(delta: float) -> void:
 	_update_visuals()
 	_find_target()
 	_handle_input(delta)
+	_update_speed()
 	_update_alert()
+	_update_toasts(delta)
+	_update_juice(delta)
 
 
 func _find_target() -> void:
@@ -142,16 +186,107 @@ func _update_alert() -> void:
 	for f: String in Base.failures:
 		var where := "the Solar Array" if f == "dust" else "the %s console" % SYSTEM_LABELS[Base.FAILURE_SITES[f]]
 		lines.append("⚠ %s: repair at %s" % [Base.FAILURE_NAMES[f], where])
+	var warned := false
+	for key in Base.RESOURCES:
+		var t := Base.time_until_empty(key)
+		if t >= warning_hours:
+			continue
+		warned = true
+		var high := Base.heading_to_max(key)
+		var hint: String = HINTS_HIGH[key] if high else HINTS_LOW[key]
+		# Point at the repair when the fix is a broken machine.
+		if key == "temperature" and not high and Base.failures.has("heater_fault"):
+			hint = "repair the heater"
+		elif key == "oxygen" and not high and Base.failures.has("generator_jam"):
+			hint = "unjam the oxygen generator"
+		elif key == "oxygen" and not high and Base.failures.has("oxygen_leak"):
+			hint = "fix the oxygen leak"
+		elif key == "water" and not high and Base.failures.has("water_leak"):
+			hint = "fix the water leak"
+		elif key == "energy" and not high and Base.failures.has("dust"):
+			hint = "clean the solar panels or switch systems off"
+		lines.append("⚠ %s %s in %s: %s" % [
+			NAMES[key], "too high" if high else "too low", _fmt_hours(t), hint])
+	_danger = warned or not Base.failures.is_empty()
 	_alert.text = "\n".join(lines)
 	_alert.modulate.a = 1.0 if _blink < 0.7 else 0.6
 
 
-func _on_failure_started(_failure: String) -> void:
+## Hold F to fast-forward. A new failure drops back to normal speed until F is
+## pressed again, so nothing sneaks past.
+func _update_speed() -> void:
+	if not Input.is_action_pressed("fast_forward"):
+		_ff_blocked = false
+	var fast := Input.is_action_pressed("fast_forward") and not _ff_blocked
+	Base.time_scale = fast_forward_scale if fast else 1.0
+	_speed_label.visible = fast
+	_speed_label.text = "▶▶ ×%d" % int(fast_forward_scale)
+
+
+func _update_juice(delta: float) -> void:
+	var target := 0.0
+	if _danger:
+		target = 0.35 + 0.25 * sin(_blink * TAU)
+	_vignette.modulate.a = move_toward(_vignette.modulate.a, target, delta * 2.0)
+	var cam := get_viewport().get_camera_2d()
+	if cam:
+		_shake = maxf(_shake - delta * 20.0, 0.0)
+		cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+
+
+func _toast(text: String, color: Color = Color.WHITE) -> void:
+	_toasts.append({"text": text, "color": color, "time": 5.0})
+	if _toasts.size() > 3:
+		_toasts.pop_front()
+
+
+func _update_toasts(delta: float) -> void:
+	for t in _toasts:
+		t.time -= delta
+	_toasts = _toasts.filter(func(t): return t.time > 0.0)
+	var lines: PackedStringArray = []
+	for t in _toasts:
+		lines.append(t.text)
+	_toast_label.text = "\n".join(lines)
+	if not _toasts.is_empty():
+		_toast_label.add_theme_color_override("font_color", _toasts[-1].color)
+	# Point at waiting pods so the player knows where to go.
+	var waiting: PackedStringArray = []
+	for pod in _drops.pods:
+		waiting.append("Supply pod (%s) waiting at the %s: %s left" % [
+			pod.kind.capitalize(), pod.site_name, _fmt_hours(_drops.hours_left(pod))])
+	if not waiting.is_empty():
+		_toast_label.text += ("\n" if not lines.is_empty() else "") + "\n".join(waiting)
+
+
+func _on_pod_landed(pod: Dictionary) -> void:
+	_toast("Supply pod landing on the %s!" % pod.site_name, Color(0.6, 1.0, 0.6))
+
+
+func _on_pod_collected(pod: Dictionary) -> void:
+	_toast("Collected: %s" % SupplyDrops.KINDS[pod.kind][2], Color(0.6, 1.0, 0.6))
+
+
+func _on_pod_lost(pod: Dictionary) -> void:
+	_toast("A %s pod drifted away" % pod.kind, Color(1.0, 0.7, 0.4))
+
+
+func _fmt_hours(h: float) -> String:
+	var m := int(round(h * 60.0))
+	return "%dh %02dm" % [m / 60, m % 60]
+
+
+func _on_failure_started(failure: String) -> void:
 	_blink = 0.0
+	_shake = 10.0
+	_ff_blocked = true
+	_toast("ALARM: %s!" % Base.FAILURE_NAMES[failure], COLOR_BROKEN)
 
 
-func _on_failure_repaired(_failure: String) -> void:
+func _on_failure_repaired(failure: String) -> void:
 	_repair_progress = 0.0
+	_repairs += 1
+	_toast("Fixed: %s" % Base.FAILURE_NAMES[failure], Color(0.6, 1.0, 0.6))
 
 
 func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
@@ -169,18 +304,35 @@ func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
 		"temperature": "The base overheated past %d °C" % int(c.temperature_max),
 	}
 	var reason: String = high[resource] if too_high else low[resource]
+	_shake = 14.0
 	_show_end("%s at hour %.1f.\nThe rescue ship was %.1f hours away." % [
-		reason, hour, Base.hours_until_rescue()])
+		reason, hour, Base.hours_until_rescue()], false)
 
 
 func _on_game_won() -> void:
 	var s := "The rescue ship has landed. You survived 72 hours!\n"
 	s += "Left: %.2f kg oxygen, %.1f kWh, %.1f L water, %.1f °C" % [
 		Base.oxygen, Base.energy, Base.water, Base.temperature]
-	_show_end(s)
+	_show_end(s, true)
 
 
-func _show_end(text: String) -> void:
+## Score: 10 per hour survived, 40 per repair, 60 per pod, 1000 for the rescue.
+func _score(won: bool) -> int:
+	return int(Base.hour) * 10 + _repairs * 40 + _drops.collected * 60 + (1000 if won else 0)
+
+
+func _show_end(text: String, won: bool) -> void:
+	var score := _score(won)
+	var cfg := ConfigFile.new()
+	cfg.load(BEST_PATH)
+	var best: int = cfg.get_value("score", "best", 0)
+	var record := score > best
+	if record:
+		cfg.set_value("score", "best", score)
+		cfg.save(BEST_PATH)
+	text += "\n\nScore %d  (%dh survived, %d repairs, %d pods%s)" % [
+		score, int(Base.hour), _repairs, _drops.collected, ", rescued" if won else ""]
+	text += "\nNEW BEST!" if record else "\nBest %d" % best
 	_end_label.text = text + "\n\nPress R to try again"
 	_end_panel.visible = true
 	_prompt.visible = false
@@ -224,6 +376,52 @@ func _build_ui() -> void:
 	_alert.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_alert)
 
+	_toast_label = Label.new()
+	_toast_label.anchor_left = 0.0
+	_toast_label.anchor_right = 1.0
+	_toast_label.offset_top = 184.0
+	_toast_label.offset_bottom = 300.0
+	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast_label.add_theme_font_size_override("font_size", 16)
+	_toast_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_toast_label.add_theme_constant_override("outline_size", 4)
+	_toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_toast_label)
+
+	_speed_label = Label.new()
+	_speed_label.anchor_left = 0.5
+	_speed_label.anchor_right = 0.5
+	_speed_label.anchor_top = 1.0
+	_speed_label.anchor_bottom = 1.0
+	_speed_label.offset_left = -60.0
+	_speed_label.offset_right = 60.0
+	_speed_label.offset_top = -130.0
+	_speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_speed_label.add_theme_font_size_override("font_size", 22)
+	_speed_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_speed_label.add_theme_constant_override("outline_size", 4)
+	_speed_label.visible = false
+	layer.add_child(_speed_label)
+
+	# Red glow around the screen edges that pulses while something is wrong.
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 0, 0, 0))
+	gradient.set_color(1, Color(1, 0.05, 0.05, 0.9))
+	gradient.set_offset(0, 0.55)
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.05, 1.05)
+	_vignette = TextureRect.new()
+	_vignette.texture = tex
+	_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette.modulate.a = 0.0
+	layer.add_child(_vignette)
+	layer.move_child(_vignette, 0)
+
 	_end_panel = PanelContainer.new()
 	_end_panel.anchor_left = 0.5
 	_end_panel.anchor_right = 0.5
@@ -245,7 +443,7 @@ func _build_ui() -> void:
 
 
 func _ensure_input_actions() -> void:
-	var bindings := {"interact": KEY_E, "restart": KEY_R}
+	var bindings := {"interact": KEY_E, "restart": KEY_R, "fast_forward": KEY_F}
 	for action: String in bindings:
 		if InputMap.has_action(action):
 			continue
