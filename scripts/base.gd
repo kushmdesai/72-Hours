@@ -26,15 +26,16 @@ signal hour_passed(hour: int)
 signal system_toggled(system: String, on: bool)
 signal failure_started(failure: String)
 signal failure_repaired(failure: String)
-## A resource ran out (temperature: fell to the safe minimum). The model stops.
-signal game_over(resource: String, hour: float)
+## A resource left its safe range: too_high is true if it went over the
+## maximum, false if it fell to the minimum. The model stops.
+signal game_over(resource: String, hour: float, too_high: bool)
 ## The rescue ship arrived with every resource above zero. The model stops.
 signal game_won
 
 const CONFIG_PATH := "res://data/base_config.tres"
 const RESOURCES := ["oxygen", "energy", "water", "temperature"]
 ## Switchable systems, matching the `system` meta on the base's consoles.
-const SYSTEMS := ["oxygen", "water", "heater"]
+const SYSTEMS := ["solar", "oxygen", "water", "heater"]
 ## Where each failure is repaired: a system console, or the solar panels.
 const FAILURE_SITES := {
 	"dust": "solar",
@@ -59,7 +60,8 @@ var energy := 0.0
 var water := 0.0
 var temperature := 0.0
 ## u_i: which systems the player has switched on.
-var switches := {"oxygen": true, "water": true, "heater": true}
+## The strike happens in the morning, so the heater starts off.
+var switches := {"solar": true, "oxygen": true, "water": true, "heater": false}
 ## Active failures, by id (keys of FAILURE_SITES).
 var failures := {}
 ## When false the clock is frozen (title screen, end screen, tests).
@@ -97,7 +99,7 @@ func reset() -> void:
 	energy = config.energy_start
 	water = config.water_start
 	temperature = config.temperature_start
-	switches = {"oxygen": true, "water": true, "heater": true}
+	switches = {"solar": true, "oxygen": true, "water": true, "heater": false}
 	failures.clear()
 	history.clear()
 	ended = false
@@ -123,7 +125,7 @@ func step(dt: float) -> void:
 		return
 	var rates := rates()
 	oxygen += rates.oxygen * dt
-	energy = minf(energy + rates.energy * dt, config.energy_capacity)
+	energy += rates.energy * dt
 	water += rates.water * dt
 	temperature += rates.temperature * dt
 
@@ -171,8 +173,11 @@ func outside_temperature(t: float = hour) -> float:
 	return lerpf(config.outside_night, config.outside_noon, light)
 
 
-## eta*A*S(t): solar power in kW, cut by dust when that failure is active.
+## eta*A*S(t): solar power in kW, cut by dust when that failure is active,
+## and 0 while the panels are disconnected at the Solar Control console.
 func solar_power(t: float = hour) -> float:
+	if not switches.solar:
+		return 0.0
 	var eta := config.panel_efficiency
 	if failures.has("dust"):
 		eta *= 1.0 - config.dust_loss
@@ -206,9 +211,6 @@ func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictiona
 	var leak_w := c.water_leak_rate if failures.has("water_leak") else 0.0
 
 	var d_energy := solar_power(t) - power_draw()
-	# A full battery can't store more; report the rate it actually changes at.
-	if e >= c.energy_capacity and d_energy > 0.0:
-		d_energy = 0.0
 
 	return {
 		"oxygen": c.generator_output * u_gen - c.oxygen_use - leak_o,
@@ -230,14 +232,15 @@ func value(resource: String) -> float:
 
 # --- Survival time ----------------------------------------------------------
 
-## Hours until a resource runs out if the switches stay as they are and
-## nothing new breaks, or INF if it lasts past the forecast horizon.
+## Hours until a resource leaves its safe range (falls to its min or climbs to
+## its max) if the switches stay as they are and nothing new breaks, or INF if
+## that doesn't happen within the forecast horizon.
 ##
 ## The simple estimate t_empty = R / |dR/dt| only holds while dR/dt is
 ## constant, but here the rates change on their own: sunlight S(t) rises and
 ## sets, and Newton's cooling slows as T approaches T_out. So the forecast runs
 ## the same Euler model forward from the current state (forecast()) and reports
-## when each resource crosses empty. Between forecasts the answer just counts
+## when each resource crosses a limit. Between forecasts the answer just counts
 ## down with the clock, since the forecast already accounts for what happens
 ## in that time.
 func time_until_empty(resource: String) -> float:
@@ -248,16 +251,14 @@ func time_until_empty(resource: String) -> float:
 
 
 ## Run the model ahead from now (no new failures, switches unchanged) and
-## return, per resource, the hours until it reaches empty (temperature: the
-## safe minimum), or INF if that doesn't happen within FORECAST_HORIZON_HOURS.
+## return, per resource, the hours until it reaches its min or max, or INF if
+## that doesn't happen within FORECAST_HORIZON_HOURS.
 func forecast() -> Dictionary:
-	var floors := {"oxygen": 0.0, "energy": 0.0, "water": 0.0,
-			"temperature": config.temperature_min}
 	var state := {"oxygen": oxygen, "energy": energy, "water": water,
 			"temperature": temperature}
 	var result := {}
 	for key in RESOURCES:
-		if state[key] <= floors[key]:
+		if not _in_range(key, state[key]):
 			result[key] = 0.0
 	var dt := FORECAST_STEP_HOURS
 	var elapsed := 0.0
@@ -268,12 +269,12 @@ func forecast() -> Dictionary:
 				continue
 			var before: float = state[key]
 			var after: float = before + r[key] * dt
-			if key == "energy":
-				after = minf(after, config.energy_capacity)
 			state[key] = after
-			if after <= floors[key]:
-				# Interpolate inside the step for a smooth countdown.
-				result[key] = elapsed + dt * (before - floors[key]) / (before - after)
+			if not _in_range(key, after):
+				# Interpolate inside the step to the limit it crossed, for a
+				# smooth countdown.
+				var limit := max_of(key) if after >= max_of(key) else min_of(key)
+				result[key] = elapsed + dt * (limit - before) / (after - before)
 		elapsed += dt
 	for key in RESOURCES:
 		if not result.has(key):
@@ -380,21 +381,29 @@ func _roll_failures(dt: float) -> void:
 # --- Bookkeeping ------------------------------------------------------------
 
 func _check_end() -> void:
-	var empty := ""
-	if oxygen <= 0.0:
-		empty = "oxygen"
-	elif energy <= 0.0:
-		empty = "energy"
-	elif water <= 0.0:
-		empty = "water"
-	elif temperature <= config.temperature_min:
-		empty = "temperature"
-	if empty != "":
-		ended = true
-		game_over.emit(empty, hour)
-	elif hour >= config.rescue_hours:
+	for key in RESOURCES:
+		if not _in_range(key, value(key)):
+			ended = true
+			game_over.emit(key, hour, value(key) >= max_of(key))
+			return
+	if hour >= config.rescue_hours:
 		ended = true
 		game_won.emit()
+		return
+
+
+## Lowest safe value of a resource (oxygen_min, energy_min, ...).
+func min_of(resource: String) -> float:
+	return config.get(resource + "_min")
+
+
+## Highest safe value of a resource (oxygen_max, energy_max, ...).
+func max_of(resource: String) -> float:
+	return config.get(resource + "_max")
+
+
+func _in_range(resource: String, v: float) -> bool:
+	return v > min_of(resource) and v < max_of(resource)
 
 
 func _record() -> void:

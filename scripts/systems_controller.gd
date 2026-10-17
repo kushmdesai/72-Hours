@@ -3,7 +3,8 @@ extends Node2D
 ## Connects the Base model to the map: switches, repairs, alarms and the end screen.
 ##
 ## Walk up to a system console in the Moonbase and press E to switch that system
-## on or off (its u_i term in the equations). When something has failed, hold E
+## on or off (its u_i term in the equations). The Solar Control console connects
+## or disconnects the panels, to stop a full battery overcharging. When something has failed, hold E
 ## at the console (or at any solar panel for dust) to repair it. Console screens
 ## show green = on, grey = off, flashing red = broken.
 
@@ -13,6 +14,7 @@ extends Node2D
 @export var repair_seconds: float = 2.0
 
 const SYSTEM_LABELS := {
+	"solar": "solar panels",
 	"oxygen": "oxygen generator",
 	"water": "water recycler",
 	"heater": "heater",
@@ -104,10 +106,10 @@ func _handle_input(delta: float) -> void:
 			on = not on
 		text = "%s: %s\nE to switch %s" % [
 			SYSTEM_LABELS[_target_site].capitalize(), "ON" if on else "OFF", "off" if on else "on"]
-	elif _target_site == "solar":
-		text = "Solar input %.1f kW  (draw %.1f kW)" % [Base.solar_power(), Base.power_draw()]
-		if Base.failures.has("dust"):
-			text += "\nPanels dusty: clean them on the Solar Array"
+		if _target_site == "solar":
+			text += "\nSolar %.1f kW, draw %.1f kW" % [Base.solar_power(), Base.power_draw()]
+			if Base.failures.has("dust"):
+				text += "\nPanels dusty: clean them on the Solar Array"
 	else:
 		_prompt.visible = false
 		return
@@ -152,15 +154,23 @@ func _on_failure_repaired(_failure: String) -> void:
 	_repair_progress = 0.0
 
 
-func _on_game_over(resource: String, hour: float) -> void:
-	var reasons := {
-		"oxygen": "The oxygen ran out",
+func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
+	var c := Base.config
+	var low := {
+		"oxygen": "Oxygen fell below %.1f kg and you passed out" % c.oxygen_min,
 		"energy": "The battery went flat",
 		"water": "The water ran out",
-		"temperature": "The base froze below %d °C" % int(Base.config.temperature_min),
+		"temperature": "The base froze below %d °C" % int(c.temperature_min),
 	}
+	var high := {
+		"oxygen": "Oxygen built up past %.1f kg and the air caught fire" % c.oxygen_max,
+		"energy": "The battery overcharged past %d kWh and burned out" % int(c.energy_max),
+		"water": "The water tank overflowed",
+		"temperature": "The base overheated past %d °C" % int(c.temperature_max),
+	}
+	var reason: String = high[resource] if too_high else low[resource]
 	_show_end("%s at hour %.1f.\nThe rescue ship was %.1f hours away." % [
-		reasons[resource], hour, Base.hours_until_rescue()])
+		reason, hour, Base.hours_until_rescue()])
 
 
 func _on_game_won() -> void:

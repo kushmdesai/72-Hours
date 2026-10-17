@@ -21,7 +21,7 @@ const RESOURCES := ["oxygen", "energy", "water", "temperature"]
 ## Temperature is "empty" when it falls to the lowest safe limit, not zero.
 const CONFIG := {
 	"oxygen": {"label": "Oxygen", "unit": "kg", "min": 0.0, "max": 4.0, "floor": 0.0},
-	"energy": {"label": "Energy", "unit": "kWh", "min": 0.0, "max": 60.0, "floor": 0.0},
+	"energy": {"label": "Energy", "unit": "kWh", "min": 0.0, "max": 80.0, "floor": 0.0},
 	"water": {"label": "Water", "unit": "L", "min": 0.0, "max": 40.0, "floor": 0.0},
 	"temperature": {"label": "Temp", "unit": "°C", "min": -20.0, "max": 40.0, "floor": 5.0},
 }
@@ -180,7 +180,7 @@ func _build() -> void:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 4)
 	panel.add_child(grid)
-	for header in ["", "", "Now", "Rate", "Empty in"]:
+	for header in ["", "", "Now", "Rate", "Limit in"]:
 		grid.add_child(_label(header, 11, COLOR_DIM))
 	for key in RESOURCES:
 		var cfg: Dictionary = CONFIG[key]
