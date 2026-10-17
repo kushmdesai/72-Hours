@@ -42,6 +42,9 @@ const SYSTEMS := {
 	"greenhouse": "Greenhouse",
 }
 
+## Multiplies every font size and fixed width in the HUD, for readability.
+const UI_SCALE := 1.2
+
 const COLOR_OK := Color(0.45, 0.85, 1.0)
 const COLOR_GOOD := Color(0.4, 0.9, 0.55)
 const COLOR_WARN := Color(1.0, 0.75, 0.3)
@@ -179,11 +182,11 @@ func _refresh() -> void:
 		if not is_inf(survive) and limiting == "" and time_until_empty(key) == survive:
 			limiting = key
 
-	_clock_label.text = "HOUR %d / %d" % [int(hours_elapsed), int(rescue_hours)]
+	_clock_label.text = "HOUR %d/%d" % [int(hours_elapsed), int(rescue_hours)]
 	_mission_bar.set_range(0.0, rescue_hours)
 	_mission_bar.value = hours_elapsed
 	_mission_bar.fill_color = COLOR_OK
-	_rescue_label.text = "Rescue in %s" % _fmt_hours(rescue)
+	_rescue_label.text = "rescue %s" % _fmt_hours(rescue)
 
 	var color := _status_color(survive, rescue)
 	_survive_label.text = "∞" if is_inf(survive) else _fmt_hours(survive)
@@ -197,7 +200,7 @@ func _refresh() -> void:
 	else:
 		verdict = "%s short" % _fmt_hours(rescue - survive)
 	if limiting != "":
-		verdict += "  ·  %s %s first" % [CONFIG[limiting].label.to_lower(),
+		verdict += " · %s %s first" % [CONFIG[limiting].label.to_lower(),
 				"max" if heading_to_max(limiting) else "min"]
 	_verdict_label.text = verdict
 	_verdict_label.add_theme_color_override("font_color", color)
@@ -341,7 +344,7 @@ func _build() -> void:
 		v.add_theme_constant_override("separation", 0)
 		card.add_child(v)
 		var bar := RangeBar.new()
-		bar.custom_minimum_size = Vector2(0, 16)
+		bar.custom_minimum_size = Vector2(0, 16 * UI_SCALE)
 		bar.show_limits = true
 		bar.capped = cfg.get("capped", false)
 		var row := {
@@ -367,7 +370,7 @@ func _build() -> void:
 	_rescue_label = _label("", 12, Color.WHITE)
 	box.add_child(_pair(_clock_label, _rescue_label))
 	_mission_bar = RangeBar.new()
-	_mission_bar.custom_minimum_size = Vector2(0, 4)
+	_mission_bar.custom_minimum_size = Vector2(0, 5)
 	box.add_child(_mission_bar)
 	_survive_label = _label("", 20, COLOR_GOOD)
 	box.add_child(_pair(_label("YOU LAST", 11, COLOR_DIM), _survive_label))
@@ -384,7 +387,7 @@ func _build() -> void:
 	keys.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	keys.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	keys.offset_right = -14
-	keys.offset_bottom = -88
+	keys.offset_bottom = -106
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	keys.add_theme_color_override("font_outline_color", Color.BLACK)
 	keys.add_theme_constant_override("outline_size", 3)
@@ -464,9 +467,9 @@ func _set_border(panel: PanelContainer, color: Color) -> void:
 func _label(text: String, size: int, color: Color, min_width: float = 0.0) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", int(round(size * UI_SCALE)))
 	l.add_theme_color_override("font_color", color)
-	l.custom_minimum_size.x = min_width
+	l.custom_minimum_size.x = min_width * UI_SCALE
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
@@ -475,7 +478,7 @@ func _label(text: String, size: int, color: Color, min_width: float = 0.0) -> La
 ## min and max are written at either end and the last 15% of the range at each
 ## end is tinted red as the danger zone.
 class RangeBar extends Control:
-	const LIMIT_W := 24.0
+	const LIMIT_W := 24.0 * Hud.UI_SCALE
 	var min_value := 0.0
 	var max_value := 1.0
 	var value := 0.0:
@@ -498,7 +501,7 @@ class RangeBar extends Control:
 	func _draw() -> void:
 		var x0 := LIMIT_W if show_limits else 0.0
 		var w := size.x - 2.0 * x0
-		var bar_h := minf(size.y, 10.0) if show_limits else size.y
+		var bar_h := minf(size.y, 12.0) if show_limits else size.y
 		var y0 := (size.y - bar_h) / 2.0
 		draw_rect(Rect2(x0, y0, w, bar_h), Color(1, 1, 1, 0.08))
 		if show_limits:
@@ -514,12 +517,12 @@ class RangeBar extends Control:
 			return
 		draw_rect(Rect2(x0 + w * f - 1.5, y0 - 3, 3, bar_h + 6), Color.WHITE)
 		var font := get_theme_default_font()
-		var base_y := size.y / 2.0 + 4.0
+		var base_y := size.y / 2.0 + 5.0
 		var limit_color := Color(1, 0.6, 0.6)
 		draw_string(font, Vector2(0, base_y), _short(min_value), HORIZONTAL_ALIGNMENT_RIGHT,
-				LIMIT_W - 5.0, 11, limit_color)
+				LIMIT_W - 5.0, int(11 * Hud.UI_SCALE), limit_color)
 		draw_string(font, Vector2(size.x - LIMIT_W + 5.0, base_y), _short(max_value),
-				HORIZONTAL_ALIGNMENT_LEFT, LIMIT_W - 5.0, 11,
+				HORIZONTAL_ALIGNMENT_LEFT, LIMIT_W - 5.0, int(11 * Hud.UI_SCALE),
 				Color(0.62, 0.68, 0.75) if capped else limit_color)
 
 	func _short(v: float) -> String:

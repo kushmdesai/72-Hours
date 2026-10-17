@@ -514,8 +514,8 @@ func _build_ui() -> void:
 	_alert.anchor_top = 1.0
 	_alert.anchor_bottom = 1.0
 	# Above the HUD's resource strip along the bottom of the screen.
-	_alert.offset_top = -196.0
-	_alert.offset_bottom = -106.0
+	_alert.offset_top = -216.0
+	_alert.offset_bottom = -126.0
 	_alert.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_alert.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_alert.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
