@@ -35,13 +35,18 @@ extends CharacterBody2D
 @export var jump_buffer_time: float = 0.12
 
 @export_group("Sprites")
-## Shown while standing or walking. Defaults to the Sprite2D's texture.
+## Shown while standing still. Defaults to the Sprite2D's texture.
 @export var ground_texture: Texture2D
+## Frames cycled while walking on the ground.
+@export var walk_textures: Array[Texture2D] = []
+## Distance walked per walk frame in metres, so steps keep pace with speed.
+@export var walk_stride_m: float = 1.0
 ## Shown while airborne.
 @export var jump_texture: Texture2D
 
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
+var _walk_distance_m := 0.0
 
 @onready var _sprite: Sprite2D = $Sprite2D
 
@@ -87,8 +92,22 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
-	var airborne := not is_on_floor()
-	_sprite.texture = jump_texture if airborne and jump_texture else ground_texture
+	_update_sprite(delta)
+
+
+func _update_sprite(delta: float) -> void:
+	if not is_on_floor():
+		if jump_texture:
+			_sprite.texture = jump_texture
+		return
+	var speed_mps := absf(velocity.x) / pixels_per_meter
+	if speed_mps < 0.2 or walk_textures.is_empty():
+		_walk_distance_m = 0.0
+		_sprite.texture = ground_texture
+		return
+	_walk_distance_m += speed_mps * delta
+	var frame := int(_walk_distance_m / walk_stride_m) % walk_textures.size()
+	_sprite.texture = walk_textures[frame]
 
 
 ## Predicted apex height of a full jump in metres: h = v0^2 / (2g).

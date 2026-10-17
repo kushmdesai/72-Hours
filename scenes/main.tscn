@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="4_hud"]
 [ext_resource type="Texture2D" uid="uid://ct7mum80l6fhe" path="res://assests/background/black.png" id="5_sky"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (JUMP).png" id="6_jump"]
+[ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (SIDE).png" id="7_side"]
+[ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (WALK).png" id="8_walk"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(28, 56)
@@ -32,6 +34,7 @@ stretch_mode = 1
 position = Vector2(0, -32)
 script = ExtResource("2_player")
 jump_texture = ExtResource("6_jump")
+walk_textures = Array[Texture2D]([ExtResource("7_side"), ExtResource("8_walk")])
 
 [node name="Sprite2D" type="Sprite2D" parent="Player" unique_id=86666716]
 texture_filter = 1
