@@ -69,7 +69,15 @@ var ended := false
 ## One entry per in-game hour: {hour, oxygen, energy, water, temperature}.
 var history: Array[Dictionary] = []
 
+## Forecast settings: Euler step, how far ahead to look, and how often to
+## re-run it to absorb drift (all in in-game hours).
+const FORECAST_STEP_HOURS := 0.2
+const FORECAST_HORIZON_HOURS := 240.0
+const FORECAST_REFRESH_HOURS := 0.5
+
 var _rng := RandomNumberGenerator.new()
+var _forecast := {}
+var _forecast_hour := 0.0
 var _hud: Node
 
 
@@ -94,6 +102,7 @@ func reset() -> void:
 	history.clear()
 	ended = false
 	running = true
+	_invalidate_forecast()
 	if config.seed == 0:
 		_rng.randomize()
 	else:
@@ -184,6 +193,11 @@ func power_draw() -> float:
 
 ## All four dR/dt at the current state, per in-game hour.
 func rates() -> Dictionary:
+	return rates_at(hour, oxygen, energy, water, temperature)
+
+
+## All four dR/dt at any time and state, with the current switches and failures.
+func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictionary:
 	var c := config
 	var u_gen := 1.0 if generator_running() else 0.0
 	var u_rec := 1.0 if recycler_running() else 0.0
@@ -191,9 +205,9 @@ func rates() -> Dictionary:
 	var leak_o := c.oxygen_leak_rate if failures.has("oxygen_leak") else 0.0
 	var leak_w := c.water_leak_rate if failures.has("water_leak") else 0.0
 
-	var d_energy := solar_power() - power_draw()
+	var d_energy := solar_power(t) - power_draw()
 	# A full battery can't store more; report the rate it actually changes at.
-	if energy >= c.energy_capacity and d_energy > 0.0:
+	if e >= c.energy_capacity and d_energy > 0.0:
 		d_energy = 0.0
 
 	return {
@@ -202,7 +216,7 @@ func rates() -> Dictionary:
 		"water": -(1.0 - c.recycle_efficiency * u_rec) * c.water_use
 				- c.water_per_oxygen * c.generator_output * u_gen - leak_w,
 		"temperature": (c.power_heater * u_heat
-				- c.heat_loss * (temperature - outside_temperature())) / c.heat_capacity,
+				- c.heat_loss * (temp - outside_temperature(t))) / c.heat_capacity,
 	}
 
 
@@ -216,29 +230,60 @@ func value(resource: String) -> float:
 
 # --- Survival time ----------------------------------------------------------
 
-## Hours until a resource runs out if nothing changes, or INF if it isn't falling.
-## Oxygen, energy and water use t_empty = R / |dR/dt|. Temperature follows
-## Newton's law of cooling, so it relaxes exponentially towards
-## T_eq = T_out + H*u_heat/k and never crosses it; it reaches the safe minimum
-## only if T_eq is below it, after t = (C/k) * ln((T - T_eq) / (T_min - T_eq)).
+## Hours until a resource runs out if the switches stay as they are and
+## nothing new breaks, or INF if it lasts past the forecast horizon.
+##
+## The simple estimate t_empty = R / |dR/dt| only holds while dR/dt is
+## constant, but here the rates change on their own: sunlight S(t) rises and
+## sets, and Newton's cooling slows as T approaches T_out. So the forecast runs
+## the same Euler model forward from the current state (forecast()) and reports
+## when each resource crosses empty. Between forecasts the answer just counts
+## down with the clock, since the forecast already accounts for what happens
+## in that time.
 func time_until_empty(resource: String) -> float:
-	if resource == "temperature":
-		var c := config
-		var heat := c.power_heater if heater_running() else 0.0
-		var t_eq := outside_temperature() + heat / c.heat_loss
-		var t_min := c.temperature_min
-		if temperature <= t_min:
-			return 0.0
-		if t_eq >= t_min:
-			return INF
-		return c.heat_capacity / c.heat_loss * log((temperature - t_eq) / (t_min - t_eq))
-	var r := rate(resource)
-	var left := value(resource)
-	if left <= 0.0:
-		return 0.0
-	if r >= 0.0:
-		return INF
-	return left / -r
+	if _forecast.is_empty() or hour - _forecast_hour >= FORECAST_REFRESH_HOURS:
+		_forecast = forecast()
+		_forecast_hour = hour
+	return maxf(_forecast[resource] - (hour - _forecast_hour), 0.0)
+
+
+## Run the model ahead from now (no new failures, switches unchanged) and
+## return, per resource, the hours until it reaches empty (temperature: the
+## safe minimum), or INF if that doesn't happen within FORECAST_HORIZON_HOURS.
+func forecast() -> Dictionary:
+	var floors := {"oxygen": 0.0, "energy": 0.0, "water": 0.0,
+			"temperature": config.temperature_min}
+	var state := {"oxygen": oxygen, "energy": energy, "water": water,
+			"temperature": temperature}
+	var result := {}
+	for key in RESOURCES:
+		if state[key] <= floors[key]:
+			result[key] = 0.0
+	var dt := FORECAST_STEP_HOURS
+	var elapsed := 0.0
+	while elapsed < FORECAST_HORIZON_HOURS and result.size() < RESOURCES.size():
+		var r := rates_at(hour + elapsed, state.oxygen, state.energy, state.water, state.temperature)
+		for key in RESOURCES:
+			if result.has(key):
+				continue
+			var before: float = state[key]
+			var after: float = before + r[key] * dt
+			if key == "energy":
+				after = minf(after, config.energy_capacity)
+			state[key] = after
+			if after <= floors[key]:
+				# Interpolate inside the step for a smooth countdown.
+				result[key] = elapsed + dt * (before - floors[key]) / (before - after)
+		elapsed += dt
+	for key in RESOURCES:
+		if not result.has(key):
+			result[key] = INF
+	return result
+
+
+## Throw away the cached forecast; called whenever the equations change.
+func _invalidate_forecast() -> void:
+	_forecast.clear()
 
 
 ## t_survive = min(t_O, t_E, t_W, t_T).
@@ -272,6 +317,7 @@ func set_system(system: String, on: bool) -> void:
 	if switches[system] == on:
 		return
 	switches[system] = on
+	_invalidate_forecast()
 	system_toggled.emit(system, on)
 
 
@@ -290,6 +336,7 @@ func failures_at(site: String) -> Array[String]:
 
 func repair(failure: String) -> void:
 	if failures.erase(failure):
+		_invalidate_forecast()
 		failure_repaired.emit(failure)
 
 
@@ -299,6 +346,7 @@ func trigger_failure(failure: String) -> void:
 	if failures.has(failure):
 		return
 	failures[failure] = hour
+	_invalidate_forecast()
 	failure_started.emit(failure)
 
 
