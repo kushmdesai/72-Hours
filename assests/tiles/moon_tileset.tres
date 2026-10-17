@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" path="res://assests/tiles/base_tiles.png" id="2_8qgg7"]
 [ext_resource type="Texture2D" path="res://assests/background/New Piskel-3.png.png" id="3_craters"]
 [ext_resource type="Texture2D" path="res://assests/background/New Piskel-2.png.png" id="4_regolith"]
+[ext_resource type="Texture2D" path="res://assests/Bottom-Layer.png" id="5_bottom"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_gj7a4"]
 texture = ExtResource("1_ixk65")
@@ -32,6 +33,12 @@ texture_region_size = Vector2i(32, 32)
 0:0/0 = 0
 0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
 
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_bottom"]
+texture = ExtResource("5_bottom")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+
 [resource]
 tile_size = Vector2i(32, 32)
 physics_layer_0/collision_layer = 1
@@ -39,3 +46,4 @@ sources/0 = SubResource("TileSetAtlasSource_gj7a4")
 sources/1 = SubResource("TileSetAtlasSource_hq86c")
 sources/2 = SubResource("TileSetAtlasSource_craters")
 sources/3 = SubResource("TileSetAtlasSource_regolith")
+sources/4 = SubResource("TileSetAtlasSource_bottom")
