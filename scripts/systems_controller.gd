@@ -193,9 +193,20 @@ func _update_alert() -> void:
 			continue
 		warned = true
 		var high := Base.heading_to_max(key)
+		var hint: String = HINTS_HIGH[key] if high else HINTS_LOW[key]
+		# Point at the repair when the fix is a broken machine.
+		if key == "temperature" and not high and Base.failures.has("heater_fault"):
+			hint = "repair the heater"
+		elif key == "oxygen" and not high and Base.failures.has("generator_jam"):
+			hint = "unjam the oxygen generator"
+		elif key == "oxygen" and not high and Base.failures.has("oxygen_leak"):
+			hint = "fix the oxygen leak"
+		elif key == "water" and not high and Base.failures.has("water_leak"):
+			hint = "fix the water leak"
+		elif key == "energy" and not high and Base.failures.has("dust"):
+			hint = "clean the solar panels or switch systems off"
 		lines.append("⚠ %s %s in %s: %s" % [
-			NAMES[key], "too high" if high else "too low", _fmt_hours(t),
-			HINTS_HIGH[key] if high else HINTS_LOW[key]])
+			NAMES[key], "too high" if high else "too low", _fmt_hours(t), hint])
 	_danger = warned or not Base.failures.is_empty()
 	_alert.text = "\n".join(lines)
 	_alert.modulate.a = 1.0 if _blink < 0.7 else 0.6
@@ -242,7 +253,7 @@ func _update_toasts(delta: float) -> void:
 	# Point at waiting pods so the player knows where to go.
 	var waiting: PackedStringArray = []
 	for pod in _drops.pods:
-		waiting.append("📦 %s pod at the %s (%s left)" % [
+		waiting.append("Supply pod (%s) waiting at the %s: %s left" % [
 			pod.kind.capitalize(), pod.site_name, _fmt_hours(_drops.hours_left(pod))])
 	if not waiting.is_empty():
 		_toast_label.text += ("\n" if not lines.is_empty() else "") + "\n".join(waiting)
@@ -368,7 +379,8 @@ func _build_ui() -> void:
 	_toast_label = Label.new()
 	_toast_label.anchor_left = 0.0
 	_toast_label.anchor_right = 1.0
-	_toast_label.offset_top = 64.0
+	_toast_label.offset_top = 184.0
+	_toast_label.offset_bottom = 300.0
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast_label.add_theme_font_size_override("font_size", 16)
 	_toast_label.add_theme_color_override("font_outline_color", Color.BLACK)
