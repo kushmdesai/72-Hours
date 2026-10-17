@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (JUMP).png" id="6_jump"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (SIDE).png" id="7_side"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (WALK).png" id="8_walk"]
+[ext_resource type="Texture2D" path="res://assests/Screenshot 2026-10-17 162125.png" id="9_stars"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(28, 56)
@@ -29,6 +30,18 @@ mouse_filter = 2
 texture = ExtResource("5_sky")
 expand_mode = 1
 stretch_mode = 1
+
+[node name="Stars" type="Parallax2D" parent="."]
+z_index = -10
+scroll_scale = Vector2(0.1, 0.1)
+repeat_size = Vector2(465, 446)
+repeat_times = 4
+
+[node name="Sprite2D" type="Sprite2D" parent="Stars"]
+texture_filter = 1
+texture = ExtResource("9_stars")
+centered = false
+offset = Vector2(-232, -400)
 
 [node name="Player" type="CharacterBody2D" parent="." unique_id=834655921]
 position = Vector2(0, -32)
