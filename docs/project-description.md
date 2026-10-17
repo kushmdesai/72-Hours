@@ -12,7 +12,7 @@ A meteor strike has crippled your lunar base and the rescue ship is 72 hours awa
 - **Watch four resources** on the HUD: oxygen, energy, water and base temperature, each with its current rate of change and a live "time until empty".
 - **Handle failures.** Solar panels get covered in dust, the oxygen generator jams, pipes leak and heaters fail. Walk to the broken module to repair it.
 - **Make trade-offs.** Power is limited, so you decide which systems stay on. Running the heater keeps you warm but drains the battery; making oxygen costs both water and energy.
-- **Survive 72 in-game hours.** You win if every resource stays above zero until rescue. The game ends the moment any one hits zero.
+- **Survive 72 in-game hours.** Every resource has a safe range, and you win if all four stay inside it until rescue. The game ends the moment any one leaves it, too low or too high: oxygen 0.5–4 kg (above that the air is a fire risk), energy 0–80 kWh (a full battery overcharges unless you disconnect the solar panels), water above 0 L, and temperature 5–35 °C.
 
 ## The Math Model
 
@@ -36,7 +36,7 @@ t_empty = R(t) / |dR/dt|
 t_survive = min(t_O, t_E, t_W, t_T)
 ```
 
-where `t_T` is the time until the temperature reaches the lowest safe limit. The HUD shows `t_survive` live, so the player sees right away how each decision moves their survival clock. The goal is to keep `t_survive ≥` the hours left until rescue. Because sunlight and heat loss change through the day, the rates are not really constant, so the game gets each `t_empty` by running the same Euler model forward from the current state (with the current switches) and finding when that resource crosses zero. With a constant drain this gives exactly `R / |dR/dt|`.
+where each `t` is the time until that resource reaches the edge of its safe range (for a rising resource, `(R_max − R) / (dR/dt)`). The HUD shows `t_survive` live, so the player sees right away how each decision moves their survival clock. The goal is to keep `t_survive ≥` the hours left until rescue. Because sunlight and heat loss change through the day, the rates are not really constant, so the game gets each `t_empty` by running the same Euler model forward from the current state (with the current switches) and finding when that resource crosses its min or max. With a constant rate this gives exactly the formulas above.
 
 **Moon physics.** The astronaut moves under `y'' = g_moon = 1.62 m/s²` (scaled at 32 px per metre), so the same push-off gives a jump about 6 times higher and longer than on Earth (9.81 / 1.62 ≈ 6).
 
