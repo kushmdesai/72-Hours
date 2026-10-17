@@ -90,13 +90,13 @@ func jump_air_time_s() -> float:
 	return 2.0 * jump_speed_mps / gravity_mps2
 
 
-## Registers move/jump actions (arrows, WASD, space) if the project's Input Map
+## Registers side-scroller actions (left/right move, up jumps; down is unbound) if the project's Input Map
 ## doesn't define them, so the player works without editing project.godot.
 func _ensure_input_actions() -> void:
 	var bindings := {
 		"move_left": [KEY_A, KEY_LEFT],
 		"move_right": [KEY_D, KEY_RIGHT],
-		"jump": [KEY_SPACE, KEY_W, KEY_UP],
+		"jump": [KEY_W, KEY_UP],
 	}
 	for action: String in bindings:
 		if InputMap.has_action(action):
