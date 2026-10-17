@@ -83,6 +83,8 @@ const FORECAST_REFRESH_HOURS := 0.5
 
 var _rng := RandomNumberGenerator.new()
 var _forecast := {}
+## Per resource, true if the last forecast saw it cross its max (not its min).
+var _forecast_hits_max := {}
 var _forecast_hour := 0.0
 var _hud: Node
 
@@ -255,28 +257,21 @@ func time_until_empty(resource: String) -> float:
 	return maxf(_forecast[resource] - (hour - _forecast_hour), 0.0)
 
 
-## True if the forecast has this resource leaving its range over the top
-## (too much) rather than through the bottom (too little).
-func heading_high(resource: String) -> bool:
-	time_until_empty(resource)
-	return _forecast.get(resource + "_high", false)
-
-
 ## Run the model ahead from now (no new failures, switches unchanged) and
 ## return, per resource, the hours until it reaches its min or max, or INF if
-## that doesn't happen within FORECAST_HORIZON_HOURS. "<resource>_high" says
-## which limit it hits.
+## that doesn't happen within FORECAST_HORIZON_HOURS.
 func forecast() -> Dictionary:
 	var state := {"oxygen": oxygen, "energy": energy, "water": water,
 			"temperature": temperature}
 	var result := {}
+	_forecast_hits_max.clear()
 	for key in RESOURCES:
 		if not _in_range(key, state[key]):
 			result[key] = 0.0
-			result[key + "_high"] = state[key] >= max_of(key)
+			_forecast_hits_max[key] = state[key] >= max_of(key)
 	var dt := FORECAST_STEP_HOURS
 	var elapsed := 0.0
-	while elapsed < FORECAST_HORIZON_HOURS and result.size() < 2 * RESOURCES.size():
+	while elapsed < FORECAST_HORIZON_HOURS and result.size() < RESOURCES.size():
 		var r := rates_at(hour + elapsed, state.oxygen, state.energy, state.water, state.temperature)
 		for key in RESOURCES:
 			if result.has(key):
@@ -289,7 +284,7 @@ func forecast() -> Dictionary:
 				# smooth countdown.
 				var limit := max_of(key) if after >= max_of(key) else min_of(key)
 				result[key] = elapsed + dt * (limit - before) / (after - before)
-				result[key + "_high"] = after >= max_of(key)
+				_forecast_hits_max[key] = after >= max_of(key)
 		elapsed += dt
 	for key in RESOURCES:
 		if not result.has(key):
@@ -300,6 +295,13 @@ func forecast() -> Dictionary:
 ## Throw away the cached forecast; called whenever the equations change.
 func _invalidate_forecast() -> void:
 	_forecast.clear()
+
+
+## True if the forecast has this resource leaving its range through the max,
+## false if through the min (or if it stays in range).
+func heading_to_max(resource: String) -> bool:
+	time_until_empty(resource)
+	return _forecast_hits_max.get(resource, false)
 
 
 ## t_survive = min(t_O, t_E, t_W, t_T).

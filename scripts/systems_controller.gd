@@ -192,7 +192,7 @@ func _update_alert() -> void:
 		if t >= warning_hours:
 			continue
 		warned = true
-		var high := Base.heading_high(key)
+		var high := Base.heading_to_max(key)
 		lines.append("⚠ %s %s in %s: %s" % [
 			NAMES[key], "too high" if high else "too low", _fmt_hours(t),
 			HINTS_HIGH[key] if high else HINTS_LOW[key]])
