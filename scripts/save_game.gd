@@ -4,8 +4,8 @@ extends RefCounted
 ##
 ## A save holds everything that changes during a run: the Base model (clock,
 ## resources, switches, failures, ice veins, history), the calamity schedule
-## (DangerEvents), supply pods (SupplyDrops), the repair count, and where the
-## astronaut is. Loading reloads the main scene and then applies the save, so
+## (DangerEvents), supply pods (SupplyDrops), the repair count, whether the
+## rescue ship is waiting to be boarded, and where the astronaut is. Loading reloads the main scene and then applies the save, so
 ## everything else starts fresh exactly as on a restart.
 
 const SLOTS := 3
@@ -62,6 +62,8 @@ static func save(slot: int, main: Node) -> Error:
 		cfg.set_value("pods", "next_hour", s._next_hour)
 		cfg.set_value("pods", "next_id", s._next_id)
 		cfg.set_value("score", "repairs", ctrl._repairs)
+		# Hour 72: the ship has landed and is waiting for the player to board.
+		cfg.set_value("rescue", "awaiting_boarding", ctrl._awaiting_boarding)
 
 	var player: Node2D = main.get_node("Player")
 	cfg.set_value("player", "location", main.current.scene_file_path)
@@ -109,6 +111,11 @@ static func apply_pending(main: Node) -> void:
 		s._next_hour = cfg.get_value("pods", "next_hour", s._next_hour)
 		s._next_id = cfg.get_value("pods", "next_id", s._next_id)
 		ctrl._repairs = cfg.get_value("score", "repairs", 0)
+		if cfg.get_value("rescue", "awaiting_boarding", false):
+			# Back to the ship waiting on the pad: the model stays stopped and
+			# the rocket offers boarding, without replaying the landing.
+			Base.ended = true
+			ctrl._awaiting_boarding = true
 
 	var location: String = cfg.get_value("player", "location", "")
 	if location != "" and ResourceLoader.exists(location):

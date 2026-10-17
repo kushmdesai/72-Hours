@@ -110,7 +110,10 @@ func _process(delta: float) -> void:
 	Base.frozen = frozen()
 	match phase:
 		"calm":
-			if h >= arrive_hour - warning_hours:
+			# No calamity that would still be passing when the rescue ship lands.
+			if arrive_hour + duration_hours >= Base.config.rescue_hours:
+				pass
+			elif h >= arrive_hour - warning_hours:
 				phase = "warning"
 				warning_started.emit()
 		"warning":
