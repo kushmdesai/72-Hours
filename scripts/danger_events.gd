@@ -26,6 +26,9 @@ signal passed
 @export var warning_hours: float = 3.0
 ## How long each calamity lasts.
 @export var duration_hours: float = 2.0
+## The systems shut down this long before arrival: resources freeze until the
+## calamity passes and the astronaut moves at a quarter speed.
+@export var freeze_hours: float = 1.0
 
 const TUNNELS := "res://scenes/locations/tunnels.tscn"
 ## name: shown in the banner and on the Control Panel; art: drawn in the sky
@@ -77,6 +80,7 @@ var _layer: CanvasLayer
 var _banner: Label
 var _hole: TextureRect
 var _tint: ColorRect
+var _frost: ColorRect
 var _t := 0.0
 var _dt := 0.0
 ## Asteroids streaking across the sky during an asteroid warning:
@@ -101,9 +105,9 @@ func _process(delta: float) -> void:
 		_layer.visible = false
 		return
 	var h := Base.hour
-	# Resources hold still while a calamity passes, so sheltering in the
-	# tunnels can't run a tank dry or over its max.
-	Base.frozen = phase == "active"
+	# Resources hold still from the last warning hour until the calamity
+	# passes, so sheltering in the tunnels can't run a tank dry or over its max.
+	Base.frozen = frozen()
 	match phase:
 		"calm":
 			if h >= arrive_hour - warning_hours:
@@ -112,7 +116,6 @@ func _process(delta: float) -> void:
 		"warning":
 			if h >= arrive_hour:
 				phase = "active"
-				Base.frozen = true
 				arrived.emit()
 				for f: String in KINDS[kind].damage:
 					if Base.FAILURE_SITES.has(f):
@@ -135,6 +138,11 @@ func _process(delta: float) -> void:
 ## True while the player is down in the ice tunnels.
 func sheltered() -> bool:
 	return main.current != null and main.current.scene_file_path == TUNNELS
+
+
+## True from `freeze_hours` before arrival until the calamity passes.
+func frozen() -> bool:
+	return phase == "active" or (phase == "warning" and hours_until_arrival() <= freeze_hours)
 
 
 func in_danger() -> bool:
@@ -187,6 +195,9 @@ func _update_visuals() -> void:
 			sprite.modulate = Color(1.0, 0.45, 0.4) if flash else Color.WHITE
 
 	var flash_on := fmod(_t, 1.0) < 0.6
+	# Blue frost over everything while the systems are shut down.
+	_frost.visible = frozen()
+	_frost.color = Color(0.45, 0.75, 1.0, 0.2 + 0.04 * sin(_t * 2.0))
 	match phase:
 		"calm":
 			_banner.visible = false
@@ -234,6 +245,8 @@ func _update_visuals() -> void:
 			_hole.visible = false
 			_tint.visible = true
 			_tint.color = Color(KINDS[kind].tint, 0.12 + 0.05 * sin(_t * 3.0))
+	if frozen():
+		_banner.text += "\n❄ SYSTEMS SHUT DOWN: base frozen, movement slowed"
 	_move_meteors()
 
 
@@ -275,6 +288,12 @@ func _build() -> void:
 	_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tint.visible = false
 	_layer.add_child(_tint)
+
+	_frost = ColorRect.new()
+	_frost.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_frost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_frost.visible = false
+	_layer.add_child(_frost)
 
 	_hole = TextureRect.new()
 	_hole.texture = KINDS[kind].art

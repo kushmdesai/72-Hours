@@ -16,6 +16,9 @@ extends CharacterBody2D
 @export_group("Running")
 ## Top horizontal speed in m/s.
 @export var max_speed_mps: float = 8.0
+## Share of top speed left while the base is frozen before and during a
+## calamity (the systems have shut down).
+const FROZEN_SPEED := 0.25
 ## Acceleration while on the ground in m/s^2. Low gravity means less grip.
 @export var ground_accel_mps2: float = 16.0
 ## Deceleration when no key is held on the ground, in m/s^2.
@@ -80,6 +83,8 @@ func _physics_process(delta: float) -> void:
 
 	var direction := Input.get_axis("move_left", "move_right")
 	var target := direction * max_speed_mps * ppm
+	if Base.frozen:
+		target *= FROZEN_SPEED
 	var accel: float
 	if is_on_floor():
 		accel = ground_accel_mps2 if direction != 0.0 else ground_friction_mps2
