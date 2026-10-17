@@ -1,18 +1,21 @@
 extends Node
 ## The base's life support as a system of coupled rate equations (autoload "Base").
 ##
-## State: oxygen O (kg), energy E (kWh), water W (L), cabin temperature T (°C).
+## State: oxygen O (kg), energy E (kWh), water W (L), cabin temperature T (°C),
+## food F (kg).
 ## Time t is in in-game hours. Every frame each dR/dt is evaluated from the
 ## current state and the system is advanced with Euler's method:
 ##   R(t + dt) = R(t) + (dR/dt) * dt
 ##
-##   dO/dt = g*u_gen - c_O - L_O
-##   dE/dt = eta*A*S(t) - (P_base + u_gen*P_gen + u_rec*P_rec + u_heat*H)
-##   dW/dt = -(1 - r*u_rec)*c_W - k_e*g*u_gen - L_W
+##   dO/dt = g*u_gen + p*y*u_gh*f(T) - c_O - L_O
+##   dE/dt = eta*A*S(t) - (P_base + u_gen*P_gen + u_rec*P_rec + u_heat*H + u_gh*P_gh)
+##   dW/dt = -(1 - r*u_rec)*c_W - k_e*g*u_gen - w_gh*u_gh - L_W
 ##   dT/dt = [H*u_heat - k*(T - T_out(t))] / C
+##   dF/dt = y*u_gh*f(T) - c_F,   f(T) = max(0, 1 - ((T - T_opt)/T_span)^2)
 ##
-## The equations are coupled: the oxygen generator draws water and energy and
-## the heater draws energy. Each u_i is 1 when that system is switched on and
+## The equations are coupled: the oxygen generator draws water and energy, the
+## heater draws energy, and the greenhouse draws water and energy and gives
+## back food and a little oxygen, growing fastest near T_opt. Each u_i is 1 when that system is switched on and
 ## working, else 0. Failures arrive as a Poisson process and change the terms
 ## until repaired. All constants live in BaseConfig (data/base_config.tres).
 ##
@@ -35,9 +38,12 @@ signal game_won
 signal supplies_added(resource: String, amount: float)
 
 const CONFIG_PATH := "res://data/base_config.tres"
-const RESOURCES := ["oxygen", "energy", "water", "temperature"]
+const RESOURCES := ["oxygen", "energy", "water", "temperature", "food"]
+## Resources whose max is a storage cap rather than a danger: anything past it
+## is lost (food spoils), and the game goes on.
+const CAPPED := ["food"]
 ## Switchable systems, matching the `system` meta on the base's consoles.
-const SYSTEMS := ["solar", "oxygen", "water", "heater"]
+const SYSTEMS := ["solar", "oxygen", "water", "heater", "greenhouse"]
 ## Where each failure is repaired: a system console, or the solar panels.
 const FAILURE_SITES := {
 	"dust": "solar",
@@ -45,6 +51,7 @@ const FAILURE_SITES := {
 	"generator_jam": "oxygen",
 	"water_leak": "water",
 	"heater_fault": "heater",
+	"blight": "greenhouse",
 }
 const FAILURE_NAMES := {
 	"dust": "Dust on the solar panels",
@@ -52,6 +59,7 @@ const FAILURE_NAMES := {
 	"generator_jam": "Oxygen generator jammed",
 	"water_leak": "Water pipe leak",
 	"heater_fault": "Heater broken",
+	"blight": "Crop blight in the greenhouse",
 }
 
 var config: BaseConfig
@@ -61,9 +69,11 @@ var oxygen := 0.0
 var energy := 0.0
 var water := 0.0
 var temperature := 0.0
+var food := 0.0
 ## u_i: which systems the player has switched on.
 ## The strike happens in the morning, so the heater starts off.
-var switches := {"solar": true, "oxygen": true, "water": true, "heater": false}
+var switches := {"solar": true, "oxygen": true, "water": true, "heater": false,
+		"greenhouse": true}
 ## Active failures, by id (keys of FAILURE_SITES).
 var failures := {}
 ## When false the clock is frozen (title screen, end screen, tests).
@@ -72,7 +82,7 @@ var running := true
 var time_scale := 1.0
 ## Set once the game is won or lost; the model no longer steps.
 var ended := false
-## One entry per in-game hour: {hour, oxygen, energy, water, temperature}.
+## One entry per in-game hour: {hour, oxygen, energy, water, temperature, food}.
 var history: Array[Dictionary] = []
 
 ## Forecast settings: Euler step, how far ahead to look, and how often to
@@ -87,6 +97,8 @@ var _forecast := {}
 var _forecast_hits_max := {}
 var _forecast_hour := 0.0
 var _hud: Node
+## Resources the HUD has a row for (its CONFIG keys), or empty to send them all.
+var _hud_keys := {}
 
 
 func _ready() -> void:
@@ -105,7 +117,9 @@ func reset() -> void:
 	energy = config.energy_start
 	water = config.water_start
 	temperature = config.temperature_start
-	switches = {"solar": true, "oxygen": true, "water": true, "heater": false}
+	food = config.food_start
+	switches = {"solar": true, "oxygen": true, "water": true, "heater": false,
+			"greenhouse": true}
 	failures.clear()
 	history.clear()
 	ended = false
@@ -135,6 +149,7 @@ func step(dt: float) -> void:
 	energy += rates.energy * dt
 	water += rates.water * dt
 	temperature += rates.temperature * dt
+	food = minf(food + rates.food * dt, config.food_max)
 
 	var previous_hour := int(hour)
 	hour += dt
@@ -162,6 +177,25 @@ func recycler_running() -> bool:
 ## u_heat: 1 if the heater is on and not broken.
 func heater_running() -> bool:
 	return switches.heater and not failures.has("heater_fault")
+
+
+## u_gh: 1 if the greenhouse is on and the crop isn't blighted.
+func greenhouse_running() -> bool:
+	return switches.greenhouse and not failures.has("blight")
+
+
+## f(T): how well the crop grows at cabin temperature T, from 1 at T_opt down
+## to 0 at T_opt +- T_span (an inverted parabola).
+func growth_factor(temp: float = temperature) -> float:
+	var x := (temp - config.crop_best_temperature) / config.crop_temperature_span
+	return maxf(0.0, 1.0 - x * x)
+
+
+## y*u_gh*f(T): food the greenhouse grows right now, in kg/h.
+func crop_growth(temp: float = temperature) -> float:
+	if not greenhouse_running():
+		return 0.0
+	return config.crop_yield * growth_factor(temp)
 
 
 ## S(t): sunlight on the panels in kW/m^2, a half sine wave by day, 0 at night.
@@ -200,15 +234,17 @@ func power_draw() -> float:
 		p += config.power_recycler
 	if heater_running():
 		p += config.power_heater
+	if greenhouse_running():
+		p += config.power_greenhouse
 	return p
 
 
-## All four dR/dt at the current state, per in-game hour.
+## Every dR/dt at the current state, per in-game hour.
 func rates() -> Dictionary:
 	return rates_at(hour, oxygen, energy, water, temperature)
 
 
-## All four dR/dt at any time and state, with the current switches and failures.
+## Every dR/dt at any time and state, with the current switches and failures.
 func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictionary:
 	var c := config
 	var u_gen := 1.0 if generator_running() else 0.0
@@ -216,16 +252,20 @@ func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictiona
 	var u_heat := 1.0 if heater_running() else 0.0
 	var leak_o := c.oxygen_leak_rate if failures.has("oxygen_leak") else 0.0
 	var leak_w := c.water_leak_rate if failures.has("water_leak") else 0.0
+	var u_gh := 1.0 if greenhouse_running() else 0.0
+	var crop := crop_growth(temp)
 
 	var d_energy := solar_power(t) - power_draw()
 
 	return {
-		"oxygen": c.generator_output * u_gen - c.oxygen_use - leak_o,
+		"oxygen": c.generator_output * u_gen + c.crop_oxygen * crop - c.oxygen_use - leak_o,
 		"energy": d_energy,
 		"water": -(1.0 - c.recycle_efficiency * u_rec) * c.water_use
-				- c.water_per_oxygen * c.generator_output * u_gen - leak_w,
+				- c.water_per_oxygen * c.generator_output * u_gen
+				- c.greenhouse_water * u_gh - leak_w,
 		"temperature": (c.power_heater * u_heat
 				- c.heat_loss * (temp - outside_temperature(t))) / c.heat_capacity,
+		"food": crop - c.food_use,
 	}
 
 
@@ -262,7 +302,7 @@ func time_until_empty(resource: String) -> float:
 ## that doesn't happen within FORECAST_HORIZON_HOURS.
 func forecast() -> Dictionary:
 	var state := {"oxygen": oxygen, "energy": energy, "water": water,
-			"temperature": temperature}
+			"temperature": temperature, "food": food}
 	var result := {}
 	_forecast_hits_max.clear()
 	for key in RESOURCES:
@@ -278,6 +318,8 @@ func forecast() -> Dictionary:
 				continue
 			var before: float = state[key]
 			var after: float = before + r[key] * dt
+			if key in CAPPED:
+				after = minf(after, max_of(key))
 			state[key] = after
 			if not _in_range(key, after):
 				# Interpolate inside the step to the limit it crossed, for a
@@ -304,7 +346,7 @@ func heading_to_max(resource: String) -> bool:
 	return _forecast_hits_max.get(resource, false)
 
 
-## t_survive = min(t_O, t_E, t_W, t_T).
+## t_survive = min(t_O, t_E, t_W, t_T, t_F).
 func survival_time() -> float:
 	var best := INF
 	for key in RESOURCES:
@@ -343,7 +385,8 @@ func toggle_system(system: String) -> void:
 	set_system(system, not switches[system])
 
 
-## Active failures repaired at this site ("solar", "oxygen", "water", "heater").
+## Active failures repaired at this site ("solar", "oxygen", "water", "heater",
+## "greenhouse").
 func failures_at(site: String) -> Array[String]:
 	var found: Array[String] = []
 	for f: String in failures:
@@ -361,7 +404,10 @@ func repair(failure: String) -> void:
 ## Add a supply delivery to a resource. It can push a resource past its max,
 ## so grabbing oxygen when the tanks are nearly full is a real risk.
 func add_supplies(resource: String, amount: float) -> void:
-	set(resource, value(resource) + amount)
+	var v := value(resource) + amount
+	if resource in CAPPED:
+		v = minf(v, max_of(resource))
+	set(resource, v)
 	_invalidate_forecast()
 	supplies_added.emit(resource, amount)
 	_check_end()
@@ -429,6 +475,8 @@ func max_of(resource: String) -> float:
 
 
 func _in_range(resource: String, v: float) -> bool:
+	if resource in CAPPED:
+		return v > min_of(resource)
 	return v > min_of(resource) and v < max_of(resource)
 
 
@@ -439,6 +487,7 @@ func _record() -> void:
 		"energy": energy,
 		"water": water,
 		"temperature": temperature,
+		"food": food,
 	})
 
 
@@ -448,8 +497,13 @@ func _push_to_hud() -> void:
 		_hud = get_tree().get_first_node_in_group("hud")
 		if not _hud:
 			return
+		var script: Script = _hud.get_script()
+		_hud_keys = script.get_script_constant_map().get("CONFIG", {}) if script else {}
 	var r := rates()
 	for key in RESOURCES:
+		# Skip resources this HUD has no row for yet.
+		if not _hud_keys.is_empty() and not _hud_keys.has(key):
+			continue
 		_hud.set_resource(key, maxf(value(key), 0.0) if key != "temperature" else temperature,
 				r[key], time_until_empty(key))
 	_hud.set_clock(hour)

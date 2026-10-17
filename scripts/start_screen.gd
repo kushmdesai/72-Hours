@@ -60,7 +60,7 @@ func _build() -> void:
 	box.add_child(_label(
 		"A meteor strike has crippled your lunar base.\n"
 		+ "The rescue ship is 72 hours away and you are the only one awake.\n"
-		+ "Keep oxygen, battery, water and temperature in their safe ranges until it lands.",
+		+ "Keep oxygen, battery, water, temperature and food in their safe ranges until it lands.",
 		18, Color(0.8, 0.85, 0.9)))
 	box.add_child(_label(
 		"A / D  move     W  jump     E  open a console / hold to repair     F  fast-forward",

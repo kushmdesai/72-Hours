@@ -3,7 +3,7 @@ extends Resource
 ## Every tunable constant of the base model, in one place.
 ##
 ## Units: time in in-game hours (h), oxygen in kg, energy in kWh, power in kW,
-## water in litres, temperature in °C. Edit data/base_config.tres in the
+## water in litres, temperature in °C, food in kg. Edit data/base_config.tres in the
 ## inspector to rebalance without touching code.
 
 @export_group("Clock")
@@ -17,6 +17,8 @@ extends Resource
 @export var energy_start: float = 30.0
 @export var water_start: float = 30.0
 @export var temperature_start: float = 21.0
+## About a day and a half of food: not enough without the greenhouse.
+@export var food_start: float = 2.5
 
 @export_group("Safe ranges")
 ## Each resource must stay strictly between its min and max; touching either
@@ -34,6 +36,10 @@ extends Resource
 ## Too cold to live below the minimum, heat stroke above the maximum.
 @export var temperature_min: float = 5.0
 @export var temperature_max: float = 35.0
+## Running out of food ends the game. The max is only the pantry's size: food
+## grown past it spoils instead of ending the game.
+@export var food_min: float = 0.0
+@export var food_max: float = 6.0
 
 @export_group("Oxygen  dO/dt = g*u_gen - c_O - L_O")
 ## g: oxygen generator output in kg/h while switched on.
@@ -58,6 +64,8 @@ extends Resource
 @export var power_recycler: float = 0.4
 ## H: heater power in kW. The heater turns this much electricity into heat.
 @export var power_heater: float = 2.5
+## P_gh: greenhouse grow lights and pumps in kW.
+@export var power_greenhouse: float = 0.3
 
 @export_group("Water  dW/dt = -(1 - r*u_rec)*c_W - k_e*g*u_gen - L_W")
 ## c_W: astronaut water use in L/h (12 L/day for drinking, food and hygiene).
@@ -79,6 +87,21 @@ extends Resource
 ## Effective outside temperature at noon around the shaded, insulated hull.
 @export var outside_noon: float = 10.0
 
+@export_group("Food  dF/dt = y*u_gh*f(T) - c_F")
+## c_F: astronaut food use, 1.8 kg/day.
+@export var food_use: float = 0.075
+## y: greenhouse crop yield in kg/h at the best temperature.
+@export var crop_yield: float = 0.18
+## T_opt: cabin temperature the crop grows best at.
+@export var crop_best_temperature: float = 23.0
+## T_span: growth falls to zero this many °C either side of T_opt, following
+## f(T) = max(0, 1 - ((T - T_opt)/T_span)^2).
+@export var crop_temperature_span: float = 14.0
+## p: kg of oxygen the plants give off per kg of food grown (photosynthesis).
+@export var crop_oxygen: float = 0.08
+## w_gh: water the plants drink and breathe out in L/h while the greenhouse is on.
+@export var greenhouse_water: float = 0.15
+
 @export_group("Day and night  S(t) = S_peak * max(0, sin(2*pi*(t + phase)/period))")
 ## Length of one day/night cycle in in-game hours. A real lunar day lasts
 ## 29.5 Earth days; it is compressed so the 72 h game sees three nights.
@@ -94,6 +117,7 @@ extends Resource
 	"generator_jam": 0.012,
 	"water_leak": 0.012,
 	"heater_fault": 0.01,
+	"blight": 0.01,
 }
 ## No failures in the first few hours so the player can learn the controls.
 @export var failure_grace_hours: float = 4.0

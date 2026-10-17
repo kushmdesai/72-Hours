@@ -34,6 +34,7 @@ const DESCENT_SECONDS := 3.0
 const KINDS := {
 	"oxygen": ["oxygen", 1.0, "O₂ +1 kg", Color(0.45, 0.8, 1.0)],
 	"water": ["water", 6.0, "H₂O +6 L", Color(0.4, 0.6, 1.0)],
+	"food": ["food", 1.5, "Food +1.5 kg", Color(0.55, 0.9, 0.4)],
 	"toolkit": ["", 0.0, "Toolkit: fixes everything", Color(1.0, 0.8, 0.3)],
 }
 
@@ -104,13 +105,17 @@ func _drop() -> void:
 func _pick_kind() -> String:
 	if Base.failures.size() >= 2:
 		return "toolkit"
-	var weights := {"oxygen": 1.0, "water": 1.0, "toolkit": 0.6}
+	var weights := {"oxygen": 1.0, "water": 1.0, "food": 0.8, "toolkit": 0.6}
 	if Base.oxygen > Base.config.oxygen_max - 1.2:
 		weights.oxygen = 0.3
 	if Base.water > Base.config.water_max - 8.0:
 		weights.water = 0.2
 	elif Base.water < 15.0:
 		weights.water = 2.0
+	if Base.food > Base.config.food_max - 2.0:
+		weights.food = 0.2
+	elif Base.food < 1.0:
+		weights.food = 2.0
 	var total := 0.0
 	for k in weights:
 		total += weights[k]

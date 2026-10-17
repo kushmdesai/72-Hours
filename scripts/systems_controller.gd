@@ -30,25 +30,31 @@ const HINTS_LOW := {
 	"energy": "switch systems off to save power",
 	"water": "switch the water recycler on",
 	"temperature": "switch the heater on",
+	"food": "switch the greenhouse on and keep the cabin near %d °C",
 }
 const HINTS_HIGH := {
 	"oxygen": "switch the oxygen generator off",
 	"energy": "disconnect the solar panels at Solar Control",
 	"water": "use some water",
 	"temperature": "switch the heater off",
+	"food": "the pantry is full",
 }
-const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temperature"}
+const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temperature",
+		"food": "Food"}
 
 const SYSTEM_LABELS := {
 	"solar": "solar panels",
 	"oxygen": "oxygen generator",
 	"water": "water recycler",
 	"heater": "heater",
+	"greenhouse": "greenhouse",
 }
 const COLOR_ON := Color(0.3, 0.9, 0.5)
 const COLOR_OFF := Color(0.25, 0.28, 0.32)
 const COLOR_BROKEN := Color(1.0, 0.25, 0.2)
 const DUST_TINT := Color(0.75, 0.6, 0.45)
+const MACHINE_OFF_TINT := Color(0.45, 0.45, 0.5)
+const MACHINE_BROKEN_TINT := Color(1.0, 0.45, 0.4)
 
 var _player: Node2D
 var _target: Node2D
@@ -199,14 +205,21 @@ func _update_visuals() -> void:
 
 
 ## Consoles drawn as a sprite swap between their on, off and broken art
-## (set as metadata on the Console node).
+## (set as metadata on the Console node). A machine with only on art is
+## dimmed when off and flashes red when broken instead.
 func _update_machine(console: Node2D, machine: Sprite2D, site: String) -> void:
 	var state := "on" if Base.switches.get(site, false) else "off"
 	if Base.failures_at(site).size() > 0:
 		state = "broken"
-	var texture := console.get_meta(state + "_texture", null) as Texture2D
+	var key := state + "_texture"
+	var texture := console.get_meta(key) as Texture2D if console.has_meta(key) else null
 	if texture:
 		machine.texture = texture
+		machine.modulate = Color.WHITE
+	elif state == "off":
+		machine.modulate = MACHINE_OFF_TINT
+	elif state == "broken":
+		machine.modulate = MACHINE_BROKEN_TINT if _blink < 0.5 else Color.WHITE
 
 
 func _update_alert() -> void:
@@ -222,6 +235,8 @@ func _update_alert() -> void:
 		warned = true
 		var high := Base.heading_to_max(key)
 		var hint: String = HINTS_HIGH[key] if high else HINTS_LOW[key]
+		if key == "food" and not high:
+			hint = hint % int(Base.config.crop_best_temperature)
 		# Point at the repair when the fix is a broken machine.
 		if key == "temperature" and not high and Base.failures.has("heater_fault"):
 			hint = "repair the heater"
@@ -231,6 +246,8 @@ func _update_alert() -> void:
 			hint = "fix the oxygen leak"
 		elif key == "water" and not high and Base.failures.has("water_leak"):
 			hint = "fix the water leak"
+		elif key == "food" and not high and Base.failures.has("blight"):
+			hint = "clear the blight at the greenhouse"
 		elif key == "energy" and not high and Base.failures.has("dust"):
 			hint = "clean the solar panels or switch systems off"
 		lines.append("⚠ %s %s in %s: %s" % [
@@ -324,12 +341,14 @@ func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
 		"energy": "The battery went flat",
 		"water": "The water ran out",
 		"temperature": "The base froze below %d °C" % int(c.temperature_min),
+		"food": "The food ran out",
 	}
 	var high := {
 		"oxygen": "Oxygen built up past %.1f kg and the air caught fire" % c.oxygen_max,
 		"energy": "The battery overcharged past %d kWh and burned out" % int(c.energy_max),
 		"water": "The water tank overflowed",
 		"temperature": "The base overheated past %d °C" % int(c.temperature_max),
+		"food": "The pantry overflowed",
 	}
 	var reason: String = high[resource] if too_high else low[resource]
 	_shake = 14.0
@@ -339,8 +358,8 @@ func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
 
 func _on_game_won() -> void:
 	var s := "The rescue ship has landed. You survived 72 hours!\n"
-	s += "Left: %.2f kg oxygen, %.1f kWh, %.1f L water, %.1f °C" % [
-		Base.oxygen, Base.energy, Base.water, Base.temperature]
+	s += "Left: %.2f kg oxygen, %.1f kWh, %.1f L water, %.1f kg food, %.1f °C" % [
+		Base.oxygen, Base.energy, Base.water, Base.food, Base.temperature]
 	_show_end(s, true)
 
 

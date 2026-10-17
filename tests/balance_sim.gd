@@ -27,8 +27,8 @@ func _init() -> void:
 
 func _play(base: Node, strategy: String) -> String:
 	var out := {"text": "", "failures": 0}
-	var low := {"oxygen": INF, "energy": INF, "water": INF, "temperature": INF}
-	var high := {"oxygen": -INF, "energy": -INF, "water": -INF, "temperature": -INF}
+	var low := {"oxygen": INF, "energy": INF, "water": INF, "temperature": INF, "food": INF}
+	var high := {"oxygen": -INF, "energy": -INF, "water": -INF, "temperature": -INF, "food": -INF}
 	var on_lost := func(r, h, high): out.text = "LOST %s %s at %.1fh" % [r, "high" if high else "low", h]
 	var on_won := func(): out.text = "WON"
 	var on_fail := func(_f): out.failures += 1
@@ -42,6 +42,7 @@ func _play(base: Node, strategy: String) -> String:
 				base.set_system("oxygen", false)
 				base.set_system("water", false)
 				base.set_system("heater", false)
+				base.set_system("greenhouse", false)
 			"do_nothing":
 				pass
 			"all_on":
@@ -65,6 +66,14 @@ func _play(base: Node, strategy: String) -> String:
 				elif base.temperature > 24.0:
 					base.set_system("heater", false)
 				base.set_system("water", base.energy > 8.0 or base.water < 8.0)
+				# Grow food by day until the pantry is nearly full; at night only
+				# when food is running low and the battery can spare it.
+				if base.food > 5.5:
+					base.set_system("greenhouse", false)
+				elif base.is_day() and base.food < 5.0:
+					base.set_system("greenhouse", true)
+				elif not base.is_day():
+					base.set_system("greenhouse", base.food < 1.0 and base.energy > 6.0)
 				for f in base.failures.keys():
 					if base.hour - base.failures[f] > repair_delay:
 						base.repair(f)
@@ -75,4 +84,4 @@ func _play(base: Node, strategy: String) -> String:
 	base.game_over.disconnect(on_lost)
 	base.game_won.disconnect(on_won)
 	base.failure_started.disconnect(on_fail)
-	return "%-22s failures %d | O %.2f-%.2f E %.1f-%.1f W %.1f-%.1f T %.1f-%.1f" % [out.text, out.failures, low.oxygen, high.oxygen, low.energy, high.energy, low.water, high.water, low.temperature, high.temperature]
+	return "%-22s failures %d | O %.2f-%.2f E %.1f-%.1f W %.1f-%.1f T %.1f-%.1f F %.1f-%.1f" % [out.text, out.failures, low.oxygen, high.oxygen, low.energy, high.energy, low.water, high.water, low.temperature, high.temperature, low.food, high.food]

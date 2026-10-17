@@ -21,11 +21,14 @@ const TITLES := {
 	"oxygen": "OXYGEN GENERATOR",
 	"water": "WATER RECYCLER",
 	"heater": "HEATER",
+	"greenhouse": "GREENHOUSE",
 }
 ## The resource each system mainly controls, drawn on the graph.
-const PRIMARY := {"solar": "energy", "oxygen": "oxygen", "water": "water", "heater": "temperature"}
-const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temp"}
-const UNITS := {"oxygen": "kg", "energy": "kWh", "water": "L", "temperature": "°C"}
+const PRIMARY := {"solar": "energy", "oxygen": "oxygen", "water": "water", "heater": "temperature",
+		"greenhouse": "food"}
+const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temp",
+		"food": "Food"}
+const UNITS := {"oxygen": "kg", "energy": "kWh", "water": "L", "temperature": "°C", "food": "kg"}
 
 const COLOR_ON := Color(0.35, 0.9, 0.55)
 const COLOR_OFF := Color(0.6, 0.64, 0.7)
@@ -88,7 +91,7 @@ func _simulate(on: bool) -> Dictionary:
 	var saved: bool = Base.switches[site]
 	Base.switches[site] = on
 	var state := {"oxygen": Base.oxygen, "energy": Base.energy,
-			"water": Base.water, "temperature": Base.temperature}
+			"water": Base.water, "temperature": Base.temperature, "food": Base.food}
 	var rates_now := Base.rates()
 	var limits := {}
 	var curve := PackedVector2Array()
@@ -99,7 +102,11 @@ func _simulate(on: bool) -> Dictionary:
 		var r := Base.rates_at(Base.hour + t, state.oxygen, state.energy, state.water, state.temperature)
 		for k: String in Base.RESOURCES:
 			state[k] += r[k] * STEP_HOURS
-			if not limits.has(k) and (state[k] <= Base.min_of(k) or state[k] >= Base.max_of(k)):
+			if k in Base.CAPPED:
+				state[k] = minf(state[k], Base.max_of(k))
+			elif not limits.has(k) and state[k] >= Base.max_of(k):
+				limits[k] = t + STEP_HOURS
+			if not limits.has(k) and state[k] <= Base.min_of(k):
 				limits[k] = t + STEP_HOURS
 		t += STEP_HOURS
 		# The curve stops where the resource leaves its safe range: game over.
@@ -148,7 +155,7 @@ func _fill_table(with_on: Dictionary, with_off: Dictionary, on: bool) -> void:
 		var changed := absf(r_on - r_off) > 0.0005
 		_table.add_child(_cell(NAMES[k], COLOR_TEXT if changed else COLOR_DIM, 14))
 		_table.add_child(_cell("%.1f %s" % [Base.value(k), UNITS[k]], COLOR_DIM, 14))
-		var places := 3 if k == "oxygen" else 2
+		var places := 3 if k in ["oxygen", "food"] else 2
 		_table.add_child(_cell(_signed(r_on, places) + "/h", _pick(changed, on, true), 14))
 		_table.add_child(_cell(_signed(r_off, places) + "/h", _pick(changed, on, false), 14))
 		_table.add_child(_cell(_hours(with_on.limits[k]), _limit_color(with_on.limits[k], changed && on), 14))
@@ -189,9 +196,11 @@ func _equation_text() -> String:
 				Base.solar_power(), Base.power_draw(), _signed(Base.rate("energy"))])
 		"oxygen":
 			var leak := c.oxygen_leak_rate if Base.failures.has("oxygen_leak") else 0.0
-			lines.append("[b]Oxygen[/b]   dO/dt = g·u_gen − c_O − L_O")
-			lines.append("      = %.3f·%s − %.3f − %.3f = [color=#ffc759]%s kg/h[/color]" % [
-				c.generator_output, u, c.oxygen_use, leak, _signed(Base.rate("oxygen"), 3)])
+			lines.append("[b]Oxygen[/b]   dO/dt = g·u_gen + p·G − c_O − L_O")
+			lines.append("      = %.3f·%s + %.3f − %.3f − %.3f = [color=#ffc759]%s kg/h[/color]" % [
+				c.generator_output, u, c.crop_oxygen * Base.crop_growth(), c.oxygen_use, leak,
+				_signed(Base.rate("oxygen"), 3)])
+			lines.append("[color=#9aa6bb]p·G is oxygen from the greenhouse plants.[/color]")
 			lines.append("")
 			lines.append("[b]It splits water[/b]   k_e·g·u_gen = %.3f·%.3f·%s = %.3f L/h" % [
 				c.water_per_oxygen, c.generator_output, u, c.water_per_oxygen * c.generator_output * float(u)])
@@ -200,9 +209,11 @@ func _equation_text() -> String:
 		"water":
 			var leak := c.water_leak_rate if Base.failures.has("water_leak") else 0.0
 			var gen := 1.0 if Base.generator_running() else 0.0
-			lines.append("[b]Water[/b]   dW/dt = −(1 − r·u_rec)·c_W − k_e·g·u_gen − L_W")
-			lines.append("      = −(1 − %.2f·%s)·%.2f − %.3f·%.3f·%d − %.2f" % [
-				c.recycle_efficiency, u, c.water_use, c.water_per_oxygen, c.generator_output, int(gen), leak])
+			var gh := 1.0 if Base.greenhouse_running() else 0.0
+			lines.append("[b]Water[/b]   dW/dt = −(1 − r·u_rec)·c_W − k_e·g·u_gen − w_gh·u_gh − L_W")
+			lines.append("      = −(1 − %.2f·%s)·%.2f − %.3f·%.3f·%d − %.2f·%d − %.2f" % [
+				c.recycle_efficiency, u, c.water_use, c.water_per_oxygen, c.generator_output, int(gen),
+				c.greenhouse_water, int(gh), leak])
 			lines.append("      = [color=#ffc759]%s L/h[/color]" % _signed(Base.rate("water"), 3))
 			lines.append("")
 			lines.append("The recycler gets back r = %d%% of the water you use." % int(c.recycle_efficiency * 100))
@@ -218,6 +229,28 @@ func _equation_text() -> String:
 			lines.append("Newton's law of cooling: heat leaks out faster the colder it is outside.")
 			lines.append("[b]It uses power[/b]   u_heat·H = %s·%.1f = %.1f kW" % [
 				u, c.power_heater, c.power_heater * float(u)])
+		"greenhouse":
+			var temp := Base.temperature
+			var f := Base.growth_factor()
+			lines.append("[b]Growth vs temperature[/b]   f(T) = max(0, 1 − ((T − T_opt)/T_span)²)")
+			lines.append("      = max(0, 1 − ((%.1f − %.0f)/%.0f)²) = [color=#ffc759]%.2f[/color]" % [
+				temp, c.crop_best_temperature, c.crop_temperature_span, f])
+			lines.append("[b]Crop growth[/b]   G = y·u_gh·f(T) = %.2f·%s·%.2f = [color=#ffc759]%.3f kg/h[/color]" % [
+				c.crop_yield, u, f, Base.crop_growth()])
+			lines.append("")
+			lines.append("[b]Food[/b]   dF/dt = G − c_F")
+			lines.append("      = %.3f − %.3f = [color=#ffc759]%s kg/h[/color]" % [
+				Base.crop_growth(), c.food_use, _signed(Base.rate("food"), 3)])
+			lines.append("The pantry holds %.0f kg; anything grown past that spoils." % c.food_max)
+			lines.append("")
+			lines.append("[b]Plants make oxygen[/b]   p·G = %.2f·%.3f = %.4f kg/h" % [
+				c.crop_oxygen, Base.crop_growth(), c.crop_oxygen * Base.crop_growth()])
+			lines.append("[b]They drink water[/b]   w_gh·u_gh = %.2f·%s = %.2f L/h" % [
+				c.greenhouse_water, u, c.greenhouse_water * float(u)])
+			lines.append("[b]Grow lights use power[/b]   u_gh·P_gh = %s·%.1f = %.1f kW" % [
+				u, c.power_greenhouse, c.power_greenhouse * float(u)])
+			if Base.failures.has("blight"):
+				lines.append("[color=#ff5a4d]Blight has stopped the crop: hold E at the greenhouse to clear it[/color]")
 	lines.append("")
 	lines.append("[color=#9aa6bb]u = %s means this machine is %s.[/color]" % [
 		u, "running" if u == "1" else "not running"])
@@ -238,6 +271,11 @@ func _symbol_text() -> String:
 		"heater": [["T", "cabin temperature (°C)"], ["H", "heater power (kW)"],
 			["k", "heat lost per °C of difference with outside (kW/°C)"], ["T_out", "outside temperature, colder at night"],
 			["C", "heat capacity of the cabin (kWh/°C)"]],
+		"greenhouse": [["F", "food in the pantry (kg)"], ["G", "food the crop grows (kg/h)"],
+			["y", "crop yield at the best temperature (kg/h)"], ["f(T)", "growth factor, 1 at T_opt and 0 far from it"],
+			["T_opt", "temperature the crop likes best (°C)"], ["T_span", "how far from T_opt the crop still grows (°C)"],
+			["c_F", "food you eat (kg/h)"], ["p", "oxygen given off per kg grown"],
+			["w_gh", "water the plants use (L/h)"], ["P_gh", "grow light power (kW)"]],
 	}
 	var lines: PackedStringArray = []
 	for row: Array in rows[site]:
@@ -252,6 +290,7 @@ func _running() -> bool:
 		"oxygen": return Base.generator_running()
 		"water": return Base.recycler_running()
 		"heater": return Base.heater_running()
+		"greenhouse": return Base.greenhouse_running()
 	return false
 
 
