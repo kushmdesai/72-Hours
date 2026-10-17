@@ -5,7 +5,8 @@ extends Node
 ## Every few in-game hours a pod floats down over the landing pad and hangs in
 ## the air under its parachute. Jump into it (the low gravity makes high grabs possible)
 ## to collect it before it drifts away. Oxygen and water pods add to those
-## tanks, which can push oxygen over its safe max, so look before you grab.
+## tanks. A pod only opens when there is room to store it, so a full tank
+## can't push a resource past its safe max and end the run.
 ## A toolkit pod instantly repairs everything that is broken.
 
 signal pod_landed(pod: Dictionary)
@@ -134,8 +135,21 @@ func _check_grab() -> void:
 		if pod.site != here or not _visuals.has(pod.id):
 			continue
 		var node = _visuals[pod.id]
-		if is_instance_valid(node) and node.global_position.distance_to(body) < grab_px:
+		if is_instance_valid(node) and has_room(pod) \
+				and node.global_position.distance_to(body) < grab_px:
 			_collect(pod)
+
+
+## True when the base can store everything in the pod without going past the
+## resource's safe max. Toolkits always fit.
+func has_room(pod: Dictionary) -> bool:
+	var info: Array = KINDS[pod.kind]
+	if info[0] == "":
+		return true
+	var after: float = Base.value(info[0]) + info[1]
+	if info[0] in Base.CAPPED:
+		return after <= Base.max_of(info[0])
+	return after < Base.max_of(info[0])
 
 
 func _collect(pod: Dictionary) -> void:
@@ -195,7 +209,9 @@ func _sync_visuals() -> void:
 			loc.add_child(node)
 			_visuals[id] = node
 		if _visuals.has(id):
-			_visuals[id].fade = clampf(hours_left(pod) / 1.5, 0.3, 1.0)
+			var visual = _visuals[id]
+			visual.fade = clampf(hours_left(pod) / 1.5, 0.3, 1.0)
+			visual.full = not has_room(pod)
 
 
 ## Height of the ground under x in the location, found with a ray cast down
@@ -219,6 +235,8 @@ class PodVisual:
 	var drop := 0.0
 	var _rest_y := NAN
 	var fade := 1.0
+	## No room to store it yet: the pod greys out and won't open.
+	var full := false
 	var _t := randf() * TAU
 	var _label: Label
 
@@ -241,6 +259,8 @@ class PodVisual:
 		drop = maxf(drop - delta * 400.0 / DESCENT_SECONDS, 0.0)
 		position.y = _rest_y - drop
 		rotation = sin(_t * 1.3) * 0.12
+		_label.text = "No room: " + text if full else text
+		self_modulate = Color(0.5, 0.5, 0.5) if full else Color.WHITE
 		modulate.a = fade if fmod(_t, 0.5) < 0.35 or fade >= 1.0 else fade * 0.4
 		queue_redraw()
 
