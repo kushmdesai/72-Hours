@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="BaseConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/base_config.gd" id="1_kfdye"]
+
+[resource]
+script = ExtResource("1_kfdye")
