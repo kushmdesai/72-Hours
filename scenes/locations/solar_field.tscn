@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/location.gd" id="1_xtsvu"]
 [ext_resource type="TileSet" path="res://assests/tiles/moon_tileset.tres" id="2_aedtj"]
+[ext_resource type="Texture2D" uid="uid://c2qeygd82tbkw" path="res://assests/background/Sci-Fi Greenhouse Pixel Module-1.png.png" id="3_greenhouse"]
 
 [node name="SolarField" type="Node2D" unique_id=878329801]
 script = ExtResource("1_xtsvu")
@@ -105,6 +106,26 @@ color = Color(0.5, 0.5, 0.55, 1)
 [node name="Panel" type="Polygon2D" parent="SolarPanels/SolarPanel50" unique_id=826971665]
 color = Color(0.12, 0.22, 0.55, 1)
 polygon = PackedVector2Array(-48, -50, 48, -74, 48, -66, -48, -42)
+
+[node name="Greenhouse" type="Node2D" parent="." unique_id=1873402215 groups=["system_consoles"]]
+position = Vector2(256, 0)
+metadata/system = "greenhouse"
+metadata/on_texture = ExtResource("3_greenhouse")
+
+[node name="Machine" type="Sprite2D" parent="Greenhouse"]
+texture_filter = 1
+position = Vector2(0, -48)
+scale = Vector2(1.25, 1.25)
+texture = ExtResource("3_greenhouse")
+
+[node name="Name" type="Label" parent="Greenhouse" unique_id=1419927386]
+offset_left = -160.0
+offset_top = -160.0
+offset_right = 160.0
+offset_bottom = -136.0
+theme_override_font_sizes/font_size = 16
+text = "GREENHOUSE"
+horizontal_alignment = 1
 
 [node name="Sign" type="Label" parent="." unique_id=306795278]
 offset_left = 960.0

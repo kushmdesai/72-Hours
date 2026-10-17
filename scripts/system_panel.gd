@@ -250,7 +250,7 @@ func _equation_text() -> String:
 			lines.append("[b]Grow lights use power[/b]   u_gh·P_gh = %s·%.1f = %.1f kW" % [
 				u, c.power_greenhouse, c.power_greenhouse * float(u)])
 			if Base.failures.has("blight"):
-				lines.append("[color=#ff5a4d]Blight has stopped the crop: hold E at the greenhouse to clear it[/color]")
+				lines.append("[color=#ff5a4d]Blight has stopped the crop: hold E at the Greenhouse on the Solar Array to clear it[/color]")
 	lines.append("")
 	lines.append("[color=#9aa6bb]u = %s means this machine is %s.[/color]" % [
 		u, "running" if u == "1" else "not running"])
