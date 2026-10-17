@@ -3,6 +3,7 @@ extends CanvasLayer
 ## Title screen shown when the game first launches. It pauses the game (so the
 ## Base model's clock doesn't run) until the player presses Enter, Space or clicks.
 ## Restarting with R after an ending skips it and goes straight back in.
+## L opens the Load page of the GameMenu over it.
 
 ## True once the player has started a run, so scene reloads don't show it again.
 static var started := false
@@ -27,6 +28,14 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	var menu := get_tree().get_first_node_in_group("game_menu") as GameMenu
+	if menu and menu.visible:
+		return
+	if menu and event is InputEventKey and event.pressed and not event.echo \
+			and event.physical_keycode == KEY_L:
+		get_viewport().set_input_as_handled()
+		menu.open_load_from_title()
+		return
 	var pressed := event.is_action_pressed("ui_accept")
 	if event is InputEventMouseButton and event.pressed:
 		pressed = true
@@ -66,6 +75,7 @@ func _build() -> void:
 		"A / D  move     W  jump     E  open a console / hold to repair     F  fast-forward",
 		16, Color(0.55, 0.65, 0.75)))
 	_hint = _label("Press Enter to start", 26, Color.WHITE)
+	box.add_child(_label("L  load a saved game      Esc / P  pause, save and load during play", 15, Color(0.6, 0.66, 0.76)))
 	box.add_child(_hint)
 
 

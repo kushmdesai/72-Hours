@@ -66,3 +66,7 @@ Step-by-step build order. Each step ends with something playable, so the game st
 - While it passes (2 h) the player must be in the ice tunnels, or the game ends. Its tides break every machine (dust, generator jam, water leak, heater fault, blight), so they need repairing after.
 - The Control Panel swaps between `control_panel_normal.png` and `control_panel_danger.png` (see-through copies of the console art), set as `normal_texture` / `danger_texture` metadata on the ControlPanel node in `base.tscn`.
 - Calamities take turns: black hole (breaks everything, including dust and blight outside), alien UFO (smashes the machines inside: oxygen leak, generator jam, water leak, heater fault; anyone outside is abducted) and asteroid shower (rocks streak across the sky during the warning; impacts cause dust, an oxygen leak, a water leak and blight). Both are defined in `KINDS` in `danger_events.gd`.
+
+## Pause menu and saves
+- `scripts/game_menu.gd` (GameMenu, added by `main.gd`): Esc or P pauses and opens Resume / Save game / Load game / Restart / Quit. It only opens when nothing else has paused the game (start screen, machine screen, endings). On the start screen, L opens the load page.
+- `scripts/save_game.gd` (SaveGame): 3 slots in `user://save_N.cfg`. A save holds the Base model (clock, resources, switches, failures, ice veins, history), the calamity schedule (phase, kind, arrival), supply pods, the repair count, and the astronaut's location and position. Loading reloads the scene like a restart and then applies the save.
