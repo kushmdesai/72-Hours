@@ -31,6 +31,8 @@ signal failure_repaired(failure: String)
 signal game_over(resource: String, hour: float, too_high: bool)
 ## The rescue ship arrived with every resource above zero. The model stops.
 signal game_won
+## A supply pod added `amount` to a resource.
+signal supplies_added(resource: String, amount: float)
 
 const CONFIG_PATH := "res://data/base_config.tres"
 const RESOURCES := ["oxygen", "energy", "water", "temperature"]
@@ -66,6 +68,8 @@ var switches := {"solar": true, "oxygen": true, "water": true, "heater": false}
 var failures := {}
 ## When false the clock is frozen (title screen, end screen, tests).
 var running := true
+## Multiplies the clock speed; the player holds F to fast-forward.
+var time_scale := 1.0
 ## Set once the game is won or lost; the model no longer steps.
 var ended := false
 ## One entry per in-game hour: {hour, oxygen, energy, water, temperature}.
@@ -104,6 +108,7 @@ func reset() -> void:
 	history.clear()
 	ended = false
 	running = true
+	time_scale = 1.0
 	_invalidate_forecast()
 	if config.seed == 0:
 		_rng.randomize()
@@ -114,7 +119,7 @@ func reset() -> void:
 
 func _process(delta: float) -> void:
 	if running and not ended:
-		step(delta * config.hours_per_second)
+		step(delta * config.hours_per_second * time_scale)
 	_push_to_hud()
 
 
@@ -250,9 +255,17 @@ func time_until_empty(resource: String) -> float:
 	return maxf(_forecast[resource] - (hour - _forecast_hour), 0.0)
 
 
+## True if the forecast has this resource leaving its range over the top
+## (too much) rather than through the bottom (too little).
+func heading_high(resource: String) -> bool:
+	time_until_empty(resource)
+	return _forecast.get(resource + "_high", false)
+
+
 ## Run the model ahead from now (no new failures, switches unchanged) and
 ## return, per resource, the hours until it reaches its min or max, or INF if
-## that doesn't happen within FORECAST_HORIZON_HOURS.
+## that doesn't happen within FORECAST_HORIZON_HOURS. "<resource>_high" says
+## which limit it hits.
 func forecast() -> Dictionary:
 	var state := {"oxygen": oxygen, "energy": energy, "water": water,
 			"temperature": temperature}
@@ -260,9 +273,10 @@ func forecast() -> Dictionary:
 	for key in RESOURCES:
 		if not _in_range(key, state[key]):
 			result[key] = 0.0
+			result[key + "_high"] = state[key] >= max_of(key)
 	var dt := FORECAST_STEP_HOURS
 	var elapsed := 0.0
-	while elapsed < FORECAST_HORIZON_HOURS and result.size() < RESOURCES.size():
+	while elapsed < FORECAST_HORIZON_HOURS and result.size() < 2 * RESOURCES.size():
 		var r := rates_at(hour + elapsed, state.oxygen, state.energy, state.water, state.temperature)
 		for key in RESOURCES:
 			if result.has(key):
@@ -275,6 +289,7 @@ func forecast() -> Dictionary:
 				# smooth countdown.
 				var limit := max_of(key) if after >= max_of(key) else min_of(key)
 				result[key] = elapsed + dt * (limit - before) / (after - before)
+				result[key + "_high"] = after >= max_of(key)
 		elapsed += dt
 	for key in RESOURCES:
 		if not result.has(key):
@@ -339,6 +354,15 @@ func repair(failure: String) -> void:
 	if failures.erase(failure):
 		_invalidate_forecast()
 		failure_repaired.emit(failure)
+
+
+## Add a supply delivery to a resource. It can push a resource past its max,
+## so grabbing oxygen when the tanks are nearly full is a real risk.
+func add_supplies(resource: String, amount: float) -> void:
+	set(resource, value(resource) + amount)
+	_invalidate_forecast()
+	supplies_added.emit(resource, amount)
+	_check_end()
 
 
 ## Start a failure now (used by the Poisson roll, and handy for testing).

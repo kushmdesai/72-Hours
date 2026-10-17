@@ -27,7 +27,7 @@ extends Resource
 @export var oxygen_max: float = 4.0
 ## A flat battery shuts down life support; charging past capacity overheats it.
 @export var energy_min: float = 0.0
-@export var energy_max: float = 80.0
+@export var energy_max: float = 100.0
 ## The tank holds 40 L, and nothing refills it, so only the minimum matters.
 @export var water_min: float = 0.0
 @export var water_max: float = 40.0
@@ -73,7 +73,7 @@ extends Resource
 ## k: heat lost per degree of difference with outside, in kW/°C.
 @export var heat_loss: float = 0.012
 ## C: heat capacity of the habitat in kWh/°C.
-@export var heat_capacity: float = 0.47
+@export var heat_capacity: float = 0.9
 ## Outside temperature at local midnight (lunar surface at night).
 @export var outside_night: float = -173.0
 ## Effective outside temperature at noon around the shaded, insulated hull.
