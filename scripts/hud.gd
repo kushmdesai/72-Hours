@@ -20,15 +20,17 @@ extends CanvasLayer
 ## Without the Base autoload, `demo` drains placeholder values so the HUD can be
 ## seen working on its own.
 
-const RESOURCES := ["oxygen", "energy", "water", "temperature"]
+const RESOURCES := ["oxygen", "energy", "water", "temperature", "food"]
 
 ## Per resource: label, unit, number format, and fallback safe range when the
-## Base autoload isn't loaded.
+## Base autoload isn't loaded. A "capped" max is a storage limit (extra is
+## lost), not a danger, so its bar has no red zone at that end.
 const CONFIG := {
 	"oxygen": {"label": "Oxygen", "unit": "kg", "fmt": "%.2f", "min": 0.5, "max": 4.0},
 	"energy": {"label": "Energy", "unit": "kWh", "fmt": "%.1f", "min": 0.0, "max": 80.0},
 	"water": {"label": "Water", "unit": "L", "fmt": "%.1f", "min": 0.0, "max": 40.0},
 	"temperature": {"label": "Temp", "unit": "°C", "fmt": "%.1f", "min": 5.0, "max": 35.0},
+	"food": {"label": "Food", "unit": "kg", "fmt": "%.1f", "min": 0.0, "max": 6.0, "capped": true},
 }
 
 ## Switchable systems as Base names them, with what the panel calls them.
@@ -37,6 +39,7 @@ const SYSTEMS := {
 	"oxygen": "O₂ generator",
 	"water": "Water recycler",
 	"heater": "Heater",
+	"greenhouse": "Greenhouse",
 }
 
 const COLOR_OK := Color(0.45, 0.85, 1.0)
@@ -79,8 +82,10 @@ func _ready() -> void:
 		rescue_hours = _base.config.rescue_hours
 	_build()
 	if demo:
-		_values = {"oxygen": 2.0, "energy": 30.0, "water": 30.0, "temperature": 21.0}
-		_rates = {"oxygen": 0.055, "energy": -1.2, "water": -0.4, "temperature": -0.25}
+		_values = {"oxygen": 2.0, "energy": 30.0, "water": 30.0, "temperature": 21.0,
+				"food": 3.0}
+		_rates = {"oxygen": 0.055, "energy": -1.2, "water": -0.4, "temperature": -0.25,
+				"food": -0.02}
 	_refresh()
 
 
@@ -140,11 +145,12 @@ func time_until_empty(key: String) -> float:
 		return _forecasts[key]
 	var rate: float = _rates.get(key, 0.0)
 	var v: float = _values.get(key, 0.0)
-	if v <= min_of(key) or v >= max_of(key):
+	var capped: bool = CONFIG[key].get("capped", false)
+	if v <= min_of(key) or (v >= max_of(key) and not capped):
 		return 0.0
 	if rate < 0.0:
 		return (v - min_of(key)) / -rate
-	if rate > 0.0:
+	if rate > 0.0 and not capped:
 		return (max_of(key) - v) / rate
 	return INF
 
@@ -235,6 +241,7 @@ func _refresh_systems() -> void:
 		"oxygen": cfg.power_generator,
 		"water": cfg.power_recycler,
 		"heater": cfg.power_heater,
+		"greenhouse": cfg.power_greenhouse,
 	}
 	for system: String in SYSTEMS:
 		var row: Dictionary = _system_rows[system]
@@ -258,6 +265,7 @@ func _refresh_systems() -> void:
 				"oxygen": _base.generator_running(),
 				"water": _base.recycler_running(),
 				"heater": _base.heater_running(),
+				"greenhouse": _base.greenhouse_running(),
 			}[system]
 			power = ("−%.1f kW" % draws[system]) if running else ("(%.1f kW)" % draws[system])
 			active = running
@@ -326,6 +334,7 @@ func _build() -> void:
 		var bar := RangeBar.new()
 		bar.custom_minimum_size = Vector2(200, 20)
 		bar.show_limits = true
+		bar.capped = cfg.get("capped", false)
 		var row := {
 			"bar": bar,
 			"value": _label("", 15, Color.WHITE, 78),
@@ -395,20 +404,11 @@ func _build() -> void:
 	for l in [_net_label, _sun_label, _risk_label]:
 		sbox.add_child(l)
 
-	# Controls, bottom right.
-	var keys := _label("A/D move   W/Space jump   E open console / hold to repair", 12, COLOR_DIM)
-	keys.anchor_left = 1.0
-	keys.anchor_right = 1.0
-	keys.anchor_top = 1.0
-	keys.anchor_bottom = 1.0
-	keys.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	keys.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	keys.offset_right = -12
-	keys.offset_bottom = -12
+	# Controls, under the rescue clock (clear of the alarms along the bottom).
+	var keys := _label("A/D move   W jump   F fast-forward\nE open console / hold to repair", 11, COLOR_DIM)
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	keys.add_theme_color_override("font_outline_color", Color.BLACK)
-	keys.add_theme_constant_override("outline_size", 4)
-	add_child(keys)
+	box.add_child(HSeparator.new())
+	box.add_child(keys)
 
 
 func _panel() -> PanelContainer:
@@ -447,6 +447,8 @@ class RangeBar extends Control:
 			queue_redraw()
 	var fill_color := Color.WHITE
 	var show_limits := false
+	## The max is a storage cap, not a danger: no red zone at that end.
+	var capped := false
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -466,7 +468,8 @@ class RangeBar extends Control:
 			var zone := w * 0.15
 			var danger := Color(1, 0.3, 0.3, 0.25)
 			draw_rect(Rect2(x0, y0, zone, bar_h), danger)
-			draw_rect(Rect2(x0 + w - zone, y0, zone, bar_h), danger)
+			if not capped:
+				draw_rect(Rect2(x0 + w - zone, y0, zone, bar_h), danger)
 		var span := maxf(max_value - min_value, 1e-6)
 		var f := clampf((value - min_value) / span, 0.0, 1.0)
 		draw_rect(Rect2(x0, y0, w * f, bar_h), Color(fill_color, 0.85))
@@ -479,7 +482,8 @@ class RangeBar extends Control:
 		draw_string(font, Vector2(0, base_y), _short(min_value), HORIZONTAL_ALIGNMENT_RIGHT,
 				LIMIT_W - 5.0, 11, limit_color)
 		draw_string(font, Vector2(size.x - LIMIT_W + 5.0, base_y), _short(max_value),
-				HORIZONTAL_ALIGNMENT_LEFT, LIMIT_W - 5.0, 11, limit_color)
+				HORIZONTAL_ALIGNMENT_LEFT, LIMIT_W - 5.0, 11,
+				Color(0.62, 0.68, 0.75) if capped else limit_color)
 
 	func _short(v: float) -> String:
 		return ("%d" % int(v)) if is_equal_approx(v, round(v)) else ("%.1f" % v)
