@@ -57,6 +57,7 @@ var _prompt: Label
 var _alert: Label
 var _end_panel: PanelContainer
 var _end_label: Label
+var _end_title: Label
 var _blink := 0.0
 var _drops: SupplyDrops
 var _toasts: Array[Dictionary] = []
@@ -89,7 +90,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if get_tree().paused:
-		if Input.is_action_just_pressed("restart"):
+		if _end_panel.visible and Input.is_action_just_pressed("restart"):
 			_restart()
 		return
 	_blink = fmod(_blink + delta, 1.0)
@@ -348,6 +349,9 @@ func _show_end(text: String, won: bool) -> void:
 	text += "\n\nScore %d  (%dh survived, %d repairs, %d pods%s)" % [
 		score, int(Base.hour), _repairs, _drops.collected, ", rescued" if won else ""]
 	text += "\nNEW BEST!" if record else "\nBest %d" % best
+	_end_title.text = "SURVIVED" if won else "WASTED"
+	_end_title.add_theme_color_override("font_color",
+		Color(0.4, 1.0, 0.55) if won else Color(0.9, 0.12, 0.1))
 	_end_label.text = text + "\n\nPress R to try again"
 	_end_panel.visible = true
 	_prompt.visible = false
@@ -450,11 +454,24 @@ func _build_ui() -> void:
 	style.set_corner_radius_all(6)
 	_end_panel.add_theme_stylebox_override("panel", style)
 	_end_panel.visible = false
-	layer.add_child(_end_panel)
+	# Its own layer above the location-name overlay (10) so nothing covers it.
+	var end_layer := CanvasLayer.new()
+	end_layer.layer = 11
+	add_child(end_layer)
+	end_layer.add_child(_end_panel)
+	var end_box := VBoxContainer.new()
+	end_box.add_theme_constant_override("separation", 12)
+	_end_panel.add_child(end_box)
+	_end_title = Label.new()
+	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_end_title.add_theme_font_size_override("font_size", 72)
+	_end_title.add_theme_color_override("font_outline_color", Color.BLACK)
+	_end_title.add_theme_constant_override("outline_size", 8)
+	end_box.add_child(_end_title)
 	_end_label = Label.new()
 	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_label.add_theme_font_size_override("font_size", 20)
-	_end_panel.add_child(_end_label)
+	end_box.add_child(_end_label)
 
 
 func _ensure_input_actions() -> void:
