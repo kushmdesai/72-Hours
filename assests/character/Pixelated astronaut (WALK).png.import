@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://clfc6mm45th5x"
-path="res://.godot/imported/Pixelated astronaut (WALK).png-90272295021a532e890dac3fe5761306.ctex"
+uid="uid://d2eafjs2pn1vt"
+path="res://.godot/imported/Pixelated astronaut (WALK).png-f196e18b23264bfbfc26d780c6711dbf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Pixelated astronaut (WALK).png"
-dest_files=["res://.godot/imported/Pixelated astronaut (WALK).png-90272295021a532e890dac3fe5761306.ctex"]
+source_file="res://assests/character/Pixelated astronaut (WALK).png"
+dest_files=["res://.godot/imported/Pixelated astronaut (WALK).png-f196e18b23264bfbfc26d780c6711dbf.ctex"]
 
 [params]
 
