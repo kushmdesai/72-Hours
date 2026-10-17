@@ -66,7 +66,7 @@ var _alert: Label
 var _end_panel: PanelContainer
 var _end_label: Label
 var _end_title: Label
-var _wasted: TextureRect
+var _wasted: ColorRect
 var _blink := 0.0
 var _drops: SupplyDrops
 var _dangers: DangerEvents
@@ -584,11 +584,10 @@ func _build_ui() -> void:
 	end_layer.layer = 11
 	add_child(end_layer)
 	end_layer.add_child(_end_panel)
-	var end_center := CenterContainer.new()
-	_end_panel.add_child(end_center)
 	var end_box := VBoxContainer.new()
+	end_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	end_box.add_theme_constant_override("separation", 16)
-	end_center.add_child(end_box)
+	_end_panel.add_child(end_box)
 	_end_title = Label.new()
 	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_title.add_theme_font_size_override("font_size", 72)
@@ -596,20 +595,29 @@ func _build_ui() -> void:
 	_end_title.add_theme_constant_override("outline_size", 8)
 	_end_title.add_theme_color_override("font_color", Color(0.4, 1.0, 0.55))
 	end_box.add_child(_end_title)
-	# The WASTED banner art, cropped to its visible pixels.
-	var wasted_tex: Texture2D = load("res://assests/background/Wasted-Screen.png")
-	var crop := AtlasTexture.new()
-	crop.atlas = wasted_tex
-	crop.region = Rect2(wasted_tex.get_image().get_used_rect())
-	_wasted = TextureRect.new()
-	_wasted.texture = crop
-	_wasted.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_wasted.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_wasted.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_wasted.custom_minimum_size = crop.region.size * 3.0
-	_wasted.modulate.a = 0.6
+	# The WASTED banner: the art's black bar stretched edge to edge, with its
+	# letters (the art minus the black) drawn in the middle.
+	var art: Image = load("res://assests/background/Wasted-Screen.png").get_image()
+	art = art.get_region(art.get_used_rect())
+	art.convert(Image.FORMAT_RGBA8)
+	for y in art.get_height():
+		for x in art.get_width():
+			var px := art.get_pixel(x, y)
+			if px.r + px.g + px.b < 0.25:
+				art.set_pixel(x, y, Color(0, 0, 0, 0))
+	_wasted = ColorRect.new()
+	_wasted.color = Color(0, 0, 0, 0.6)
+	_wasted.custom_minimum_size.y = art.get_height() * 3.0
 	_wasted.visible = false
 	end_box.add_child(_wasted)
+	var letters := TextureRect.new()
+	letters.texture = ImageTexture.create_from_image(art)
+	letters.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	letters.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	letters.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	letters.set_anchors_preset(Control.PRESET_FULL_RECT)
+	letters.modulate.a = 0.6
+	_wasted.add_child(letters)
 	_end_label = Label.new()
 	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_label.add_theme_font_size_override("font_size", 20)
@@ -622,6 +630,7 @@ func _build_ui() -> void:
 	data_style.set_corner_radius_all(6)
 	data_style.set_content_margin_all(24)
 	data_box.add_theme_stylebox_override("panel", data_style)
+	data_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	data_box.add_child(_end_label)
 	end_box.add_child(data_box)
 
