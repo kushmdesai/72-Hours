@@ -236,7 +236,15 @@ func _handle_drill(delta: float) -> void:
 		_show_prompt("Ice vein\nDrilled dry")
 		return
 	var cost := litres * Base.config.ice_energy_per_litre
-	if Input.is_action_pressed("interact"):
+	# Like supply pods, a load only comes up when the base can take it: the
+	# water must fit under the tank's max and the melt must not flatten the
+	# battery, or drilling would end the run on the spot.
+	var blocked := ""
+	if Base.water + litres >= Base.max_of("water"):
+		blocked = "Tanks too full for this load: use some water first"
+	elif Base.energy - cost <= Base.min_of("energy"):
+		blocked = "Battery too low to melt this load"
+	if Input.is_action_pressed("interact") and blocked == "":
 		_repair_progress += delta
 		if _repair_progress >= repair_seconds:
 			_repair_progress = 0.0
@@ -250,11 +258,9 @@ func _handle_drill(delta: float) -> void:
 	var n: int = Base.ice_drills.get(vein, 0)
 	var text := "Ice vein: pass %d brings %.2f L (= %.1f × %.1f^%d)\n" % [n + 1, litres, a, r, n]
 	text += "About %.1f L left (= %.2f ÷ (1 − %.1f)), costs %.1f kWh\n" % [Base.ice_left(vein), litres, r, cost]
-	text += "Hold E to drill"
+	text += "⚠ " + blocked if blocked != "" else "Hold E to drill"
 	if _repair_progress > 0.0:
 		text += "  %d%%" % int(100.0 * _repair_progress / repair_seconds)
-	if Base.water + litres > Base.max_of("water"):
-		text += "\n⚠ Tanks nearly full: this would overflow them"
 	_show_prompt(text)
 
 

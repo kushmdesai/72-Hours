@@ -300,6 +300,9 @@ func value(resource: String) -> float:
 ## down with the clock, since the forecast already accounts for what happens
 ## in that time.
 func time_until_empty(resource: String) -> float:
+	# Nothing moves while the base is frozen for a calamity.
+	if frozen:
+		return INF
 	if _forecast.is_empty() or hour - _forecast_hour >= FORECAST_REFRESH_HOURS:
 		_forecast = forecast()
 		_forecast_hour = hour
@@ -538,5 +541,5 @@ func _push_to_hud() -> void:
 		if not _hud_keys.is_empty() and not _hud_keys.has(key):
 			continue
 		_hud.set_resource(key, maxf(value(key), 0.0) if key != "temperature" else temperature,
-				r[key], time_until_empty(key))
+				0.0 if frozen else r[key], time_until_empty(key))
 	_hud.set_clock(hour)
