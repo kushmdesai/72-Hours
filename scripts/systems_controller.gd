@@ -55,6 +55,7 @@ const COLOR_BROKEN := Color(1.0, 0.25, 0.2)
 const DUST_TINT := Color(0.75, 0.6, 0.45)
 const MACHINE_OFF_TINT := Color(0.45, 0.45, 0.5)
 const MACHINE_BROKEN_TINT := Color(1.0, 0.45, 0.4)
+const DRILLED_TINT := Color(0.35, 0.35, 0.4)
 
 var _player: Node2D
 var _target: Node2D
@@ -127,12 +128,35 @@ func _find_target() -> void:
 			best = d
 			_target = panel
 			_target_site = "panel"
+	for hatch: Node2D in get_tree().get_nodes_in_group("hatches"):
+		var d := absf(hatch.global_position.x - _player.global_position.x)
+		if d < best:
+			best = d
+			_target = hatch
+			_target_site = "hatch"
+	for vein: Node2D in get_tree().get_nodes_in_group("ice_veins"):
+		var d := absf(vein.global_position.x - _player.global_position.x)
+		if d < best:
+			best = d
+			_target = vein
+			_target_site = "ice"
 
 
 func _handle_input(delta: float) -> void:
 	if not _target:
 		_prompt.visible = false
 		_repair_progress = 0.0
+		return
+	if _target_site == "hatch":
+		_repair_progress = 0.0
+		if Input.is_action_just_pressed("interact"):
+			_prompt.visible = false
+			get_parent().travel(_target.get_meta("target"), _target.get_meta("arrive"))
+			return
+		_show_prompt("%s\nE to %s" % [_target.get_meta("label"), _target.get_meta("action")])
+		return
+	if _target_site == "ice":
+		_handle_drill(delta)
 		return
 	var site := "solar" if _target_site == "panel" else _target_site
 	var broken := Base.failures_at(site)
@@ -167,9 +191,45 @@ func _handle_input(delta: float) -> void:
 		_prompt.visible = false
 		return
 
+	_show_prompt(text)
+
+
+func _show_prompt(text: String) -> void:
 	_prompt.text = text
 	_prompt.visible = true
 	_prompt.global_position = _target.global_position + Vector2(-_prompt.size.x / 2.0, -110.0)
+
+
+## Hold E at an ice vein in the tunnels to drill one load of water. Each load is
+## r times the last (Base.ice_load), and melting it costs battery energy.
+func _handle_drill(delta: float) -> void:
+	var vein := String(_target.name)
+	var litres := Base.ice_load(vein)
+	if litres <= 0.0:
+		_repair_progress = 0.0
+		_show_prompt("Ice vein\nDrilled dry")
+		return
+	var cost := litres * Base.config.ice_energy_per_litre
+	if Input.is_action_pressed("interact"):
+		_repair_progress += delta
+		if _repair_progress >= repair_seconds:
+			_repair_progress = 0.0
+			Base.drill_ice(vein)
+			_toast("Drilled ice: H₂O +%.1f L, battery −%.1f kWh" % [litres, cost], Color(0.6, 0.9, 1.0))
+			return
+	else:
+		_repair_progress = 0.0
+	var a := Base.config.ice_first_load
+	var r := Base.config.ice_load_ratio
+	var n: int = Base.ice_drills.get(vein, 0)
+	var text := "Ice vein: pass %d brings %.2f L (= %.1f × %.1f^%d)\n" % [n + 1, litres, a, r, n]
+	text += "About %.1f L left (= %.2f ÷ (1 − %.1f)), costs %.1f kWh\n" % [Base.ice_left(vein), litres, r, cost]
+	text += "Hold E to drill"
+	if _repair_progress > 0.0:
+		text += "  %d%%" % int(100.0 * _repair_progress / repair_seconds)
+	if Base.water + litres > Base.max_of("water"):
+		text += "\n⚠ Tanks nearly full: this would overflow them"
+	_show_prompt(text)
 
 
 ## Open the machine screen (scripts/system_panel.gd), which pauses the game.
@@ -199,6 +259,10 @@ func _update_visuals() -> void:
 			screen.color = COLOR_ON if Base.switches[site] else COLOR_OFF
 		else:
 			screen.color = COLOR_ON if Base.is_day() else COLOR_OFF
+	# Ice veins fade as they are drilled out.
+	for vein: Node2D in get_tree().get_nodes_in_group("ice_veins"):
+		var full := Base.ice_load(vein.name) / Base.config.ice_first_load
+		vein.modulate = DRILLED_TINT.lerp(Color.WHITE, full)
 	var dusty := Base.failures.has("dust")
 	for panel: Node2D in get_tree().get_nodes_in_group("solar_panels"):
 		panel.modulate = DUST_TINT if dusty else Color.WHITE

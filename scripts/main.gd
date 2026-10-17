@@ -39,6 +39,17 @@ func _physics_process(_delta: float) -> void:
 	_camera.reset_smoothing()
 
 
+## Go straight to another location through a hatch or ladder, arriving at the
+## node named `arrive` in it (used for the tunnels under the Moonbase).
+func travel(path: String, arrive: String) -> void:
+	_enter(path)
+	var spot := current.get_node_or_null(arrive) as Node2D
+	if spot:
+		_player.position = spot.position + Vector2(0, -32)
+	_player.velocity = Vector2.ZERO
+	_camera.reset_smoothing()
+
+
 func _enter(path: String) -> void:
 	if current:
 		remove_child(current)

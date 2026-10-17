@@ -102,6 +102,18 @@ extends Resource
 ## w_gh: water the plants drink and breathe out in L/h while the greenhouse is on.
 @export var greenhouse_water: float = 0.15
 
+@export_group("Ice mining  load_n = a * r^n,  vein total = a / (1 - r)")
+## a: litres of water the first pass of the drill brings up from an ice vein.
+@export var ice_first_load: float = 3.0
+## r: each pass brings up this fraction of the previous one, so a vein holds a
+## geometric series of water.
+@export_range(0.0, 0.95) var ice_load_ratio: float = 0.5
+## kWh of battery spent per litre to drill and melt the ice. Warming ice from
+## about -200 °C and melting it takes about 0.21 kWh/L; the drill doubles that.
+@export var ice_energy_per_litre: float = 0.5
+## A vein counts as empty once the next load would be smaller than this, in L.
+@export var ice_min_load: float = 0.2
+
 @export_group("Day and night  S(t) = S_peak * max(0, sin(2*pi*(t + phase)/period))")
 ## Length of one day/night cycle in in-game hours. A real lunar day lasts
 ## 29.5 Earth days; it is compressed so the 72 h game sees three nights.

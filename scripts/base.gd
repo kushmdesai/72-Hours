@@ -82,6 +82,8 @@ var running := true
 var time_scale := 1.0
 ## Set once the game is won or lost; the model no longer steps.
 var ended := false
+## How many times each ice vein in the tunnels has been drilled, by vein name.
+var ice_drills := {}
 ## One entry per in-game hour: {hour, oxygen, energy, water, temperature, food}.
 var history: Array[Dictionary] = []
 
@@ -121,6 +123,7 @@ func reset() -> void:
 	switches = {"solar": true, "oxygen": true, "water": true, "heater": false,
 			"greenhouse": true}
 	failures.clear()
+	ice_drills.clear()
 	history.clear()
 	ended = false
 	running = true
@@ -411,6 +414,30 @@ func add_supplies(resource: String, amount: float) -> void:
 	_invalidate_forecast()
 	supplies_added.emit(resource, amount)
 	_check_end()
+
+
+## Litres the next pass of the drill brings up from an ice vein:
+## load_n = a * r^n after n passes, or 0 once the vein is spent.
+func ice_load(vein: String) -> float:
+	var litres := config.ice_first_load * pow(config.ice_load_ratio, ice_drills.get(vein, 0))
+	return litres if litres >= config.ice_min_load else 0.0
+
+
+## Litres still in a vein: the rest of the geometric series, a*r^n / (1 - r).
+func ice_left(vein: String) -> float:
+	return ice_load(vein) / (1.0 - config.ice_load_ratio)
+
+
+## Drill one load from a vein: adds its water and takes the melting energy from
+## the battery. Returns the litres gained.
+func drill_ice(vein: String) -> float:
+	var litres := ice_load(vein)
+	if litres <= 0.0:
+		return 0.0
+	ice_drills[vein] = ice_drills.get(vein, 0) + 1
+	add_supplies("energy", -litres * config.ice_energy_per_litre)
+	add_supplies("water", litres)
+	return litres
 
 
 ## Start a failure now (used by the Poisson roll, and handy for testing).

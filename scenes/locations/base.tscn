@@ -202,3 +202,37 @@ offset_bottom = -68.0
 theme_override_font_sizes/font_size = 16
 text = "LANDING PAD →"
 horizontal_alignment = 1
+
+[node name="TunnelHatch" type="Node2D" parent="." unique_id=1650378244 groups=["hatches"]]
+position = Vector2(2240, 0)
+metadata/target = "res://scenes/locations/tunnels.tscn"
+metadata/arrive = "BaseLadder"
+metadata/label = "Hatch to the Ice Tunnels"
+metadata/action = "climb down"
+
+[node name="Rim" type="ColorRect" parent="TunnelHatch" unique_id=1209745560]
+z_index = 1
+offset_left = -26.0
+offset_top = -4.0
+offset_right = 26.0
+offset_bottom = 4.0
+mouse_filter = 2
+color = Color(0.85, 0.7, 0.2, 1)
+
+[node name="Lid" type="ColorRect" parent="TunnelHatch" unique_id=1873945120]
+z_index = 1
+offset_left = -20.0
+offset_top = -3.0
+offset_right = 20.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(0.2, 0.22, 0.25, 1)
+
+[node name="Sign" type="Label" parent="TunnelHatch" unique_id=744129608]
+offset_left = -120.0
+offset_top = -60.0
+offset_right = 120.0
+offset_bottom = -36.0
+theme_override_font_sizes/font_size = 14
+text = "▼ ICE TUNNELS"
+horizontal_alignment = 1
