@@ -15,6 +15,7 @@
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_off.png" id="13_oxygen_off"]
 [ext_resource type="Texture2D" path="res://assests/background/oxygen_generator_broken.png" id="14_oxygen_broken"]
 [ext_resource type="Texture2D" path="res://assests/background/control_panel_normal.png" id="cp_normal"]
+[ext_resource type="Texture2D" path="res://assests/background/control_panel_danger.png" id="cp_danger"]
 
 [node name="Base" type="Node2D" unique_id=25766017]
 script = ExtResource("1_vsmf7")
@@ -173,6 +174,7 @@ color = Color(0.55, 0.6, 0.7, 1)
 [node name="ControlPanel" type="Node2D" parent="Rooms/Habitat" groups=["control_panels"]]
 position = Vector2(70, 0)
 metadata/normal_texture = ExtResource("cp_normal")
+metadata/danger_texture = ExtResource("cp_danger")
 
 [node name="Screen" type="Sprite2D" parent="Rooms/Habitat/ControlPanel"]
 texture_filter = 1
