@@ -20,9 +20,9 @@ const RESOURCES := ["oxygen", "energy", "water", "temperature"]
 ## Per resource: label, unit, bar range, and the floor that counts as "empty".
 ## Temperature is "empty" when it falls to the lowest safe limit, not zero.
 const CONFIG := {
-	"oxygen": {"label": "Oxygen", "unit": "kg", "min": 0.0, "max": 20.0, "floor": 0.0},
-	"energy": {"label": "Energy", "unit": "kWh", "min": 0.0, "max": 100.0, "floor": 0.0},
-	"water": {"label": "Water", "unit": "L", "min": 0.0, "max": 200.0, "floor": 0.0},
+	"oxygen": {"label": "Oxygen", "unit": "kg", "min": 0.0, "max": 4.0, "floor": 0.0},
+	"energy": {"label": "Energy", "unit": "kWh", "min": 0.0, "max": 60.0, "floor": 0.0},
+	"water": {"label": "Water", "unit": "L", "min": 0.0, "max": 40.0, "floor": 0.0},
 	"temperature": {"label": "Temp", "unit": "°C", "min": -20.0, "max": 40.0, "floor": 5.0},
 }
 
@@ -50,7 +50,7 @@ func _ready() -> void:
 	add_to_group("hud")
 	_build()
 	if demo:
-		_values = {"oxygen": 14.0, "energy": 60.0, "water": 150.0, "temperature": 21.0}
+		_values = {"oxygen": 2.0, "energy": 40.0, "water": 30.0, "temperature": 21.0}
 		_rates = {"oxygen": -0.035, "energy": -1.2, "water": -0.4, "temperature": -0.25}
 	_refresh()
 
