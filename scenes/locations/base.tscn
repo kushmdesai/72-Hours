@@ -230,9 +230,9 @@ color = Color(0.2, 0.22, 0.25, 1)
 
 [node name="Sign" type="Label" parent="TunnelHatch" unique_id=744129608]
 offset_left = -120.0
-offset_top = -60.0
+offset_top = -146.0
 offset_right = 120.0
-offset_bottom = -36.0
+offset_bottom = -122.0
 theme_override_font_sizes/font_size = 14
 text = "▼ ICE TUNNELS"
 horizontal_alignment = 1

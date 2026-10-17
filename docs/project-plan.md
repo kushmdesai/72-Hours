@@ -10,6 +10,7 @@ Step-by-step build order. Each step ends with something playable, so the game st
 - The Moonbase is a row of rooms on a TileMapLayer: West Airlock, Solar Control, Oxygen Generator, Water Recycler, Heater, Habitat (start point), East Airlock. Each system room has a `Console` node (group `system_consoles`, meta `system`) ready for step 5.
 - The Solar Array has the panels (group `solar_panels`) for dust failures, plus a crater and a boulder to jump. The Landing Pad has a `ShipLandingPoint` for the rescue ship.
 - Camera follows the player with limits at the map edges.
+- A hatch in the Habitat floor leads down a ladder to the Ice Tunnels (`scenes/locations/tunnels.tscn`). Hold E at one of its three ice veins to drill water: pass n brings up `a·rⁿ` litres (a = 3 L, r = 0.5), so a vein holds the geometric series `a/(1 − r)` = 6 L, and melting costs 0.5 kWh per litre (`BaseConfig` "Ice mining").
 
 ## 3. Resource simulation (done)
 - Autoload `Base` (`scripts/base.gd`) holds `oxygen`, `energy`, `water`, `temperature` and steps every `dR/dt` with Euler's method each frame. It emits `updated`, `hour_passed`, `system_toggled`, `failure_started`, `failure_repaired`, `game_over` and `game_won`, records one history entry per in-game hour, and pushes values, rates and time-to-empty into the HUD.
