@@ -128,8 +128,8 @@ func _check_grab() -> void:
 	for pod in pods.duplicate():
 		if pod.site != here or not _visuals.has(pod.id):
 			continue
-		var node: Node2D = _visuals[pod.id]
-		if node.global_position.distance_to(body) < grab_px:
+		var node = _visuals[pod.id]
+		if is_instance_valid(node) and node.global_position.distance_to(body) < grab_px:
 			_collect(pod)
 
 
@@ -148,7 +148,8 @@ func _collect(pod: Dictionary) -> void:
 func _remove(pod: Dictionary) -> void:
 	pods.erase(pod)
 	if _visuals.has(pod.id):
-		_visuals[pod.id].queue_free()
+		if is_instance_valid(_visuals[pod.id]):
+			_visuals[pod.id].queue_free()
 		_visuals.erase(pod.id)
 
 
@@ -165,8 +166,10 @@ func _sync_visuals() -> void:
 	for pod in pods:
 		if pod.site == here:
 			live[pod.id] = pod
+	# A pod's visual is freed along with its location when the player leaves,
+	# so read it untyped: a typed assignment of a freed instance errors.
 	for id in _visuals.keys():
-		var node: Node2D = _visuals[id]
+		var node = _visuals[id]
 		if not is_instance_valid(node) or not live.has(id):
 			if is_instance_valid(node):
 				node.queue_free()
