@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://mdci2lk343nx"
-path="res://.godot/imported/green generator1.png.png-a9b60a7a34c63d096be401a44730f5c2.ctex"
+uid="uid://bs8ibvx8gmb1x"
+path="res://.godot/imported/Bottom-Layer.png-ec30d5c2194389cddaa19321dac7ae2b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assests/green generator1.png.png"
-dest_files=["res://.godot/imported/green generator1.png.png-a9b60a7a34c63d096be401a44730f5c2.ctex"]
+source_file="res://assests/background/Bottom-Layer.png"
+dest_files=["res://.godot/imported/Bottom-Layer.png-ec30d5c2194389cddaa19321dac7ae2b.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b3dhludy7qudb"
-path="res://.godot/imported/red generator-1.png (1).png-08e875fb084de2c26da7a5be5eb71db1.ctex"
+uid="uid://bnrwv8if7c1rr"
+path="res://.godot/imported/oxygen_generator_off.png-8ec2d3e11f2351a0425b98828a849497.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assests/red generator-1.png (1).png"
-dest_files=["res://.godot/imported/red generator-1.png (1).png-08e875fb084de2c26da7a5be5eb71db1.ctex"]
+source_file="res://assests/background/oxygen_generator_off.png"
+dest_files=["res://.godot/imported/oxygen_generator_off.png-8ec2d3e11f2351a0425b98828a849497.ctex"]
 
 [params]
 

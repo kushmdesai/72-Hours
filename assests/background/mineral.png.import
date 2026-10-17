@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bs8ibvx8gmb1x"
-path="res://.godot/imported/Bottom-Layer.png-5809c4fc7ff0120d6e0130d1eddfea1d.ctex"
+uid="uid://dbl6nwrmallhw"
+path="res://.godot/imported/mineral.png-c878dd5f42bdfbf8a9fb232294c2e3cf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assests/Bottom-Layer.png"
-dest_files=["res://.godot/imported/Bottom-Layer.png-5809c4fc7ff0120d6e0130d1eddfea1d.ctex"]
+source_file="res://assests/background/mineral.png"
+dest_files=["res://.godot/imported/mineral.png-c878dd5f42bdfbf8a9fb232294c2e3cf.ctex"]
 
 [params]
 

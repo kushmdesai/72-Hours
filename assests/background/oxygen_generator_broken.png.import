@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dbl6nwrmallhw"
-path="res://.godot/imported/mineral.png-0a3c50f38686803264de6dc96e6ab910.ctex"
+uid="uid://crxa0u4vsh6px"
+path="res://.godot/imported/oxygen_generator_broken.png-abb814fd7e6ebd0ebbc324a3171dafa1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assests/mineral.png"
-dest_files=["res://.godot/imported/mineral.png-0a3c50f38686803264de6dc96e6ab910.ctex"]
+source_file="res://assests/background/oxygen_generator_broken.png"
+dest_files=["res://.godot/imported/oxygen_generator_broken.png-abb814fd7e6ebd0ebbc324a3171dafa1.ctex"]
 
 [params]
 
