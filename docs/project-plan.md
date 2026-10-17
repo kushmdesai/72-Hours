@@ -5,9 +5,10 @@ Step-by-step build order. Each step ends with something playable, so the game st
 ## 1. Movement (done)
 - Astronaut moves left/right and jumps under moon gravity (1.62 m/s², 32 px/m) in `scenes/main.tscn`.
 
-## 2. Base map
-- Build the base as a row of rooms in a TileMap: Airlock, Solar Control, Oxygen Generator, Water Recycler, Heater, Habitat.
-- Add the scene transitions at either end of the map (waiting on Mahesh's map).
+## 2. Base map (done)
+- Three locations in `scenes/locations/`, swapped by `scripts/main.gd` when the player walks off either end: Solar Array ← Moonbase → Landing Pad. The outer ends of the Solar Array and Landing Pad are crater cliffs too high to jump.
+- The Moonbase is a row of rooms on a TileMapLayer: West Airlock, Solar Control, Oxygen Generator, Water Recycler, Heater, Habitat (start point), East Airlock. Each system room has a `Console` node (group `system_consoles`, meta `system`) ready for step 5.
+- The Solar Array has the panels (group `solar_panels`) for dust failures, plus a crater and a boulder to jump. The Landing Pad has a `ShipLandingPoint` for the rescue ship.
 - Camera follows the player with limits at the map edges.
 
 ## 3. Resource simulation

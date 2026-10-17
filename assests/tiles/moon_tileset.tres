@@ -1,0 +1,25 @@
+[gd_resource type="TileSet" format=3]
+
+[ext_resource type="Texture2D" path="res://assests/background/New Piskel-1.png.png" id="1_ixk65"]
+[ext_resource type="Texture2D" path="res://assests/tiles/base_tiles.png" id="2_8qgg7"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_gj7a4"]
+texture = ExtResource("1_ixk65")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_hq86c"]
+texture = ExtResource("2_8qgg7")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+1:0/0 = 0
+2:0/0 = 0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+
+[resource]
+tile_size = Vector2i(32, 32)
+physics_layer_0/collision_layer = 1
+sources/0 = SubResource("TileSetAtlasSource_gj7a4")
+sources/1 = SubResource("TileSetAtlasSource_hq86c")
