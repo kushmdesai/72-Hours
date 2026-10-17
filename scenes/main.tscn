@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (FRONT).png" id="3_astro"]
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="4_hud"]
+[ext_resource type="Texture2D" path="res://assests/background/black.png" id="5_sky"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(28, 56)
@@ -14,14 +15,17 @@ script = ExtResource("1_main")
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -1
 
-[node name="Space" type="ColorRect" parent="Background"]
+[node name="Space" type="TextureRect" parent="Background"]
+texture_filter = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 1)
+texture = ExtResource("5_sky")
+expand_mode = 1
+stretch_mode = 1
 
 [node name="Player" type="CharacterBody2D" parent="."]
 position = Vector2(0, -32)
