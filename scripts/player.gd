@@ -34,6 +34,12 @@ extends CharacterBody2D
 ## A jump pressed this long before landing still fires on touchdown, in s.
 @export var jump_buffer_time: float = 0.12
 
+@export_group("Sprites")
+## Shown while standing or walking. Defaults to the Sprite2D's texture.
+@export var ground_texture: Texture2D
+## Shown while airborne.
+@export var jump_texture: Texture2D
+
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
 
@@ -41,6 +47,8 @@ var _jump_buffer_timer := 0.0
 
 
 func _ready() -> void:
+	if ground_texture == null:
+		ground_texture = _sprite.texture
 	_ensure_input_actions()
 
 
@@ -78,6 +86,9 @@ func _physics_process(delta: float) -> void:
 		_sprite.flip_h = direction < 0.0
 
 	move_and_slide()
+
+	var airborne := not is_on_floor()
+	_sprite.texture = jump_texture if airborne and jump_texture else ground_texture
 
 
 ## Predicted apex height of a full jump in metres: h = v0^2 / (2g).
