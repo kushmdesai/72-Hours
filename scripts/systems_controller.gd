@@ -98,12 +98,12 @@ func _ready() -> void:
 	_dangers.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_dangers)
 	_dangers.warning_started.connect(func() -> void:
-		_toast("Black hole coming! Shelter in the ice tunnels", Color(1.0, 0.55, 0.3)))
+		_toast("The %s is coming! Shelter in the ice tunnels" % _dangers.kind_name(), Color(1.0, 0.55, 0.3)))
 	_dangers.arrived.connect(func() -> void:
 		_shake = 10.0)
 	_dangers.passed.connect(func() -> void:
-		_toast("The black hole has passed: repair the damaged machines", Color(0.6, 1.0, 0.6)))
-	_dangers.caught.connect(_on_caught_by_black_hole)
+		_toast("The %s has gone: repair the damaged machines" % _dangers.kind_name(), Color(0.6, 1.0, 0.6)))
+	_dangers.caught.connect(_on_caught_outside)
 	Base.failure_started.connect(_on_failure_started)
 	Base.failure_repaired.connect(_on_failure_repaired)
 	Base.game_over.connect(_on_game_over)
@@ -384,7 +384,7 @@ func _update_toasts(delta: float) -> void:
 	for t in _toasts:
 		lines.append(t.text)
 	_toast_label.text = "\n".join(lines)
-	# Make room for the black hole banner (DangerEvents) above the toasts.
+	# Make room for the calamity banner (DangerEvents) above the toasts.
 	_toast_label.offset_top = 212.0 if _dangers.in_danger() else 184.0
 	if not _toasts.is_empty():
 		_toast_label.add_theme_color_override("font_color", _toasts[-1].color)
@@ -449,10 +449,10 @@ func _on_game_over(resource: String, hour: float, too_high: bool) -> void:
 		reason, hour, Base.hours_until_rescue()], false)
 
 
-func _on_caught_by_black_hole() -> void:
+func _on_caught_outside() -> void:
 	Base.ended = true
 	_shake = 18.0
-	_show_end("You were outside when the black hole passed at hour %.1f\nand were pulled off the Moon.\nShelter in the ice tunnels when the Control Panel warns you." % Base.hour, false)
+	_show_end(_dangers.caught_text() + "\nShelter in the ice tunnels when the Control Panel warns you.", false)
 
 
 func _on_game_won() -> void:
