@@ -166,10 +166,14 @@ func _handle_input(delta: float) -> void:
 func _update_visuals() -> void:
 	var flash := _blink < 0.5
 	for console: Node2D in get_tree().get_nodes_in_group("system_consoles"):
+		var site: String = console.get_meta("system", "")
+		var machine := console.get_node_or_null("Machine") as Sprite2D
+		if machine:
+			_update_machine(console, machine, site)
+			continue
 		var screen := console.get_node_or_null("Screen") as ColorRect
 		if not screen:
 			continue
-		var site: String = console.get_meta("system", "")
 		if Base.failures_at(site).size() > 0:
 			screen.color = COLOR_BROKEN if flash else COLOR_OFF
 		elif site in Base.SYSTEMS:
@@ -179,6 +183,17 @@ func _update_visuals() -> void:
 	var dusty := Base.failures.has("dust")
 	for panel: Node2D in get_tree().get_nodes_in_group("solar_panels"):
 		panel.modulate = DUST_TINT if dusty else Color.WHITE
+
+
+## Consoles drawn as a sprite swap between their on, off and broken art
+## (set as metadata on the Console node).
+func _update_machine(console: Node2D, machine: Sprite2D, site: String) -> void:
+	var state := "on" if Base.switches.get(site, false) else "off"
+	if Base.failures_at(site).size() > 0:
+		state = "broken"
+	var texture := console.get_meta(state + "_texture", null) as Texture2D
+	if texture:
+		machine.texture = texture
 
 
 func _update_alert() -> void:
