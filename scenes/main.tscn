@@ -1,21 +1,22 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://tcf8ebjqmiig"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
-[ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (FRONT).png" id="3_astro"]
+[ext_resource type="Script" uid="uid://bj1a8h8t8142a" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://bx32nasyac0iw" path="res://scripts/player.gd" id="2_player"]
+[ext_resource type="Texture2D" uid="uid://dcwgrf3tstyt4" path="res://assests/character/Pixelated astronaut (FRONT).png" id="3_astro"]
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="4_hud"]
-[ext_resource type="Texture2D" path="res://assests/background/black.png" id="5_sky"]
+[ext_resource type="Texture2D" uid="uid://ct7mum80l6fhe" path="res://assests/background/black.png" id="5_sky"]
+[ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (JUMP).png" id="6_jump"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(28, 56)
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=1571482547]
 script = ExtResource("1_main")
 
-[node name="Background" type="CanvasLayer" parent="."]
+[node name="Background" type="CanvasLayer" parent="." unique_id=1854591755]
 layer = -1
 
-[node name="Space" type="TextureRect" parent="Background"]
+[node name="Space" type="TextureRect" parent="Background" unique_id=1995956234]
 texture_filter = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -27,26 +28,27 @@ texture = ExtResource("5_sky")
 expand_mode = 1
 stretch_mode = 1
 
-[node name="Player" type="CharacterBody2D" parent="."]
+[node name="Player" type="CharacterBody2D" parent="." unique_id=834655921]
 position = Vector2(0, -32)
 script = ExtResource("2_player")
+jump_texture = ExtResource("6_jump")
 
-[node name="Sprite2D" type="Sprite2D" parent="Player"]
+[node name="Sprite2D" type="Sprite2D" parent="Player" unique_id=86666716]
 texture_filter = 1
 scale = Vector2(2, 2)
 texture = ExtResource("3_astro")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=988999581]
 position = Vector2(0, -4)
 shape = SubResource("RectangleShape2D_body")
 
-[node name="Camera2D" type="Camera2D" parent="Player"]
+[node name="Camera2D" type="Camera2D" parent="Player" unique_id=1232571229]
 position_smoothing_enabled = true
 
-[node name="Overlay" type="CanvasLayer" parent="."]
+[node name="Overlay" type="CanvasLayer" parent="." unique_id=1383198595]
 layer = 10
 
-[node name="Fade" type="ColorRect" parent="Overlay"]
+[node name="Fade" type="ColorRect" parent="Overlay" unique_id=1061858500]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -55,7 +57,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 1)
 
-[node name="LocationName" type="Label" parent="Overlay"]
+[node name="LocationName" type="Label" parent="Overlay" unique_id=915009984]
 anchors_preset = 10
 anchor_right = 1.0
 offset_top = 24.0
@@ -64,4 +66,4 @@ grow_horizontal = 2
 theme_override_font_sizes/font_size = 28
 horizontal_alignment = 1
 
-[node name="HUD" parent="." instance=ExtResource("4_hud")]
+[node name="HUD" parent="." unique_id=1935818461 instance=ExtResource("4_hud")]
