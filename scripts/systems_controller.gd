@@ -66,6 +66,7 @@ var _alert: Label
 var _end_panel: PanelContainer
 var _end_label: Label
 var _end_title: Label
+var _wasted: TextureRect
 var _blink := 0.0
 var _drops: SupplyDrops
 var _dangers: DangerEvents
@@ -478,9 +479,9 @@ func _show_end(text: String, won: bool) -> void:
 	text += "\n\nScore %d  (%dh survived, %d repairs, %d pods%s)" % [
 		score, int(Base.hour), _repairs, _drops.collected, ", rescued" if won else ""]
 	text += "\nNEW BEST!" if record else "\nBest %d" % best
-	_end_title.text = "SURVIVED" if won else "WASTED"
-	_end_title.add_theme_color_override("font_color",
-		Color(0.4, 1.0, 0.55) if won else Color(0.9, 0.12, 0.1))
+	_end_title.text = "SURVIVED"
+	_end_title.visible = won
+	_wasted.visible = not won
 	_end_label.text = text + "\n\nPress R to try again"
 	_end_panel.visible = true
 	_prompt.visible = false
@@ -596,7 +597,21 @@ func _build_ui() -> void:
 	_end_title.add_theme_font_size_override("font_size", 72)
 	_end_title.add_theme_color_override("font_outline_color", Color.BLACK)
 	_end_title.add_theme_constant_override("outline_size", 8)
+	_end_title.add_theme_color_override("font_color", Color(0.4, 1.0, 0.55))
 	end_box.add_child(_end_title)
+	# The WASTED banner art, cropped to its visible pixels.
+	var wasted_tex: Texture2D = load("res://assests/background/Wasted-Screen.png")
+	var crop := AtlasTexture.new()
+	crop.atlas = wasted_tex
+	crop.region = Rect2(wasted_tex.get_image().get_used_rect())
+	_wasted = TextureRect.new()
+	_wasted.texture = crop
+	_wasted.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_wasted.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_wasted.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_wasted.custom_minimum_size = crop.region.size * 2.0
+	_wasted.visible = false
+	end_box.add_child(_wasted)
 	_end_label = Label.new()
 	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_label.add_theme_font_size_override("font_size", 20)
