@@ -78,6 +78,8 @@ var _danger := false
 var _shake := 0.0
 var _ff_blocked := false
 var _repairs := 0
+## True once the rescue ship has landed and is waiting for the player to board.
+var _awaiting_boarding := false
 var _panel_closed_frame := -10
 
 
@@ -108,6 +110,7 @@ func _ready() -> void:
 	Base.failure_repaired.connect(_on_failure_repaired)
 	Base.game_over.connect(_on_game_over)
 	Base.game_won.connect(_on_game_won)
+	add_to_group("systems_controller")
 
 
 func _process(delta: float) -> void:
@@ -310,6 +313,12 @@ func _update_machine(console: Node2D, machine: Sprite2D, site: String) -> void:
 
 
 func _update_alert() -> void:
+	if _awaiting_boarding:
+		_danger = false
+		_alert.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+		_alert.text = "The rescue ship is waiting on the Landing Pad: walk up to it and press E to board"
+		_alert.modulate.a = 1.0 if _blink < 0.7 else 0.6
+		return
 	var lines: PackedStringArray = []
 	for f: String in Base.failures:
 		var where := "the %s console" % SYSTEM_LABELS[Base.FAILURE_SITES[f]]
@@ -455,8 +464,18 @@ func _on_caught_outside() -> void:
 	_show_end(_dangers.caught_text() + "\nShelter in the ice tunnels when the Control Panel warns you.", false)
 
 
+## The rescue ship has landed: the model stops and the player has to reach it.
 func _on_game_won() -> void:
-	var s := "The rescue ship has landed. You survived 72 hours!\n"
+	_awaiting_boarding = true
+	Base.time_scale = 1.0
+	_toast("The rescue ship has landed! Get to the Landing Pad and board it", Color(0.6, 1.0, 0.6))
+
+
+## Called by the rescue rocket once it has flown off with the player aboard.
+func rocket_departed() -> void:
+	_awaiting_boarding = false
+	_alert.visible = false
+	var s := "You made it onto the rescue ship. You survived 72 hours!\n"
 	s += "Left: %.2f kg oxygen, %.1f kWh, %.1f L water, %.1f kg food, %.1f °C" % [
 		Base.oxygen, Base.energy, Base.water, Base.food, Base.temperature]
 	_show_end(s, true)
