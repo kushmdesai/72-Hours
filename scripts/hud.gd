@@ -319,12 +319,16 @@ func _fmt_rate(r: float) -> String:
 
 
 func _build() -> void:
-	# Top strip: one card per resource, then the survival card.
+	# Bottom strip: one card per resource, then the survival card. It sits on
+	# the ground below the base so the sky stays clear for the calamities.
 	var strip := HBoxContainer.new()
+	strip.anchor_top = 1.0
 	strip.anchor_right = 1.0
+	strip.anchor_bottom = 1.0
+	strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	strip.offset_left = 10
 	strip.offset_right = -10
-	strip.offset_top = 10
+	strip.offset_bottom = -10
 	strip.add_theme_constant_override("separation", 6)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(strip)
@@ -371,25 +375,26 @@ func _build() -> void:
 	_verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	box.add_child(_verdict_label)
 
-	# Controls: one quiet line under the strip, right side.
+	# Controls: one quiet line above the strip, right side.
 	var keys := _label("A/D move  ·  W jump  ·  E console (hold: repair)  ·  F fast-forward", 11, COLOR_DIM)
 	keys.anchor_left = 1.0
 	keys.anchor_right = 1.0
+	keys.anchor_top = 1.0
+	keys.anchor_bottom = 1.0
 	keys.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	keys.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	keys.offset_right = -14
-	keys.offset_top = 92
+	keys.offset_bottom = -88
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	keys.add_theme_color_override("font_outline_color", Color.BLACK)
 	keys.add_theme_constant_override("outline_size", 3)
 	add_child(keys)
 
-	# Systems and power, bottom left.
+	# Systems and power, top left in the sky (the calamities appear further
+	# right, and this keeps the tunnels' floor clear).
 	_systems_panel = _panel()
-	_systems_panel.anchor_top = 1.0
-	_systems_panel.anchor_bottom = 1.0
-	_systems_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_systems_panel.offset_left = 10
-	_systems_panel.offset_bottom = -10
+	_systems_panel.offset_top = 10
 	add_child(_systems_panel)
 	var sbox := VBoxContainer.new()
 	sbox.add_theme_constant_override("separation", 1)
