@@ -15,13 +15,13 @@ extends CharacterBody2D
 
 @export_group("Running")
 ## Top horizontal speed in m/s.
-@export var max_speed_mps: float = 4.0
+@export var max_speed_mps: float = 8.0
 ## Acceleration while on the ground in m/s^2. Low gravity means less grip.
-@export var ground_accel_mps2: float = 8.0
+@export var ground_accel_mps2: float = 16.0
 ## Deceleration when no key is held on the ground, in m/s^2.
-@export var ground_friction_mps2: float = 6.0
+@export var ground_friction_mps2: float = 12.0
 ## Steering acceleration while airborne, in m/s^2.
-@export var air_accel_mps2: float = 2.0
+@export var air_accel_mps2: float = 4.0
 
 @export_group("Jumping")
 ## Take-off speed in m/s. 3.13 m/s is what clears 0.5 m on Earth; on the Moon
