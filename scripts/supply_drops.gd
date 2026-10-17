@@ -1,9 +1,9 @@
 class_name SupplyDrops
 extends Node
-## Supply pods parachuted from orbit onto the Landing Pad and Solar Array.
+## Supply pods parachuted from orbit onto the Landing Pad.
 ##
-## Every few in-game hours a pod comes down at a random spot, hanging in the air
-## under its parachute. Jump into it (the low gravity makes high grabs possible)
+## Every few in-game hours a pod floats down over the landing pad and hangs in
+## the air under its parachute. Jump into it (the low gravity makes high grabs possible)
 ## to collect it before it drifts away. Oxygen and water pods add to those
 ## tanks, which can push oxygen over its safe max, so look before you grab.
 ## A toolkit pod instantly repairs everything that is broken.
@@ -22,11 +22,14 @@ signal pod_lost(pod: Dictionary)
 @export var hover_m := Vector2(2.6, 4.4)
 ## How close (pixels) the astronaut's middle must get to a pod to grab it.
 @export var grab_px: float = 30.0
+## Pods come down within this many metres either side of the pad's
+## ShipLandingPoint.
+@export var pad_half_width_m: float = 6.0
 
-const SITES := {
-	"res://scenes/locations/landing_pad.tscn": "Landing Pad",
-	"res://scenes/locations/solar_field.tscn": "Solar Array",
-}
+const SITE := "res://scenes/locations/landing_pad.tscn"
+const SITE_NAME := "Landing Pad"
+## Real seconds a fresh pod takes to float down into place.
+const DESCENT_SECONDS := 3.0
 ## kind: [resource, amount, label, colour]
 const KINDS := {
 	"oxygen": ["oxygen", 1.0, "O₂ +1 kg", Color(0.45, 0.8, 1.0)],
@@ -77,18 +80,19 @@ func hours_left(pod: Dictionary) -> float:
 
 
 func _drop() -> void:
-	var site: String = SITES.keys()[_rng.randi() % SITES.size()]
-	var location: Location = load(site).instantiate()
-	var width := location.width_px()
+	var location: Location = load(SITE).instantiate()
+	var point := location.get_node_or_null("ShipLandingPoint") as Node2D
+	var center := point.position.x if point else location.width_px() / 2.0
 	location.free()
+	var spread := pad_half_width_m * Location.PIXELS_PER_METER
 	var kind := _pick_kind()
 	_next_id += 1
 	var pod := {
 		"id": _next_id,
 		"kind": kind,
-		"site": site,
-		"site_name": SITES[site],
-		"x_px": _rng.randf_range(width * 0.15, width * 0.85),
+		"site": SITE,
+		"site_name": SITE_NAME,
+		"x_px": _rng.randf_range(center - spread, center + spread),
 		"height_px": _rng.randf_range(hover_m.x, hover_m.y) * Location.PIXELS_PER_METER,
 		"landed_hour": Base.hour,
 	}
@@ -177,6 +181,9 @@ func _sync_visuals() -> void:
 			node.color = KINDS[pod.kind][3]
 			node.text = KINDS[pod.kind][2]
 			node.position = Vector2(pod.x_px, ground - pod.height_px)
+			# A pod that just arrived is still floating down from the sky.
+			var age_s: float = (Base.hour - pod.landed_hour) / Base.config.hours_per_second
+			node.drop = 400.0 * clampf(1.0 - age_s / DESCENT_SECONDS, 0.0, 1.0)
 			loc.add_child(node)
 			_visuals[id] = node
 		if _visuals.has(id):
@@ -200,6 +207,9 @@ class PodVisual:
 	extends Node2D
 	var color := Color.WHITE
 	var text := ""
+	## Pixels still to fall before reaching the hover height.
+	var drop := 0.0
+	var _rest_y := NAN
 	var fade := 1.0
 	var _t := randf() * TAU
 	var _label: Label
@@ -218,6 +228,10 @@ class PodVisual:
 
 	func _process(delta: float) -> void:
 		_t += delta
+		if is_nan(_rest_y):
+			_rest_y = position.y
+		drop = maxf(drop - delta * 400.0 / DESCENT_SECONDS, 0.0)
+		position.y = _rest_y - drop
 		rotation = sin(_t * 1.3) * 0.12
 		modulate.a = fade if fmod(_t, 0.5) < 0.35 or fade >= 1.0 else fade * 0.4
 		queue_redraw()

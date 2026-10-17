@@ -49,7 +49,7 @@ Step-by-step build order. Each step ends with something playable, so the game st
 - An in-game "Model" screen showing the equations and the live values plugged in.
 
 ## 10. Polish and balance
-- Done: supply pods parachute onto the Landing Pad and Solar Array every 5 to 9 game hours and need a moon jump to grab (oxygen, water, or a toolkit that fixes everything); hold F to fast-forward ×6 (a new failure drops back to normal speed); warnings with a hint when a resource will leave its range within 3 h; red screen pulse and camera shake on trouble; score and saved best on the end screen (`scripts/supply_drops.gd`, `scripts/systems_controller.gd`).
+- Done: supply pods parachute down over the landing pad every 5 to 9 game hours and need a moon jump to grab (oxygen, water, or a toolkit that fixes everything); hold F to fast-forward ×6 (a new failure drops back to normal speed); warnings with a hint when a resource will leave its range within 3 h; red screen pulse and camera shake on trouble; score and saved best on the end screen (`scripts/supply_drops.gd`, `scripts/systems_controller.gd`).
 - Done: gentler start. The battery can hold 100 kWh and the cabin's heat capacity is doubled, so doing nothing lasts until the first night (about 13 h) instead of a few hours.
 - Playtest and tune the constants so a careful player survives with a small margin.
 - Sound effects for alarms, footsteps and repairs; simple sprites for rooms and astronaut.
