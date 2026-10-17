@@ -571,17 +571,11 @@ func _build_ui() -> void:
 	layer.add_child(_vignette)
 	layer.move_child(_vignette, 0)
 
+	# The end screen covers the whole window in black, with its contents centred.
 	_end_panel = PanelContainer.new()
-	_end_panel.anchor_left = 0.5
-	_end_panel.anchor_right = 0.5
-	_end_panel.anchor_top = 0.5
-	_end_panel.anchor_bottom = 0.5
-	_end_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_end_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.02, 0.04, 0.08, 0.9)
-	style.set_content_margin_all(24)
-	style.set_corner_radius_all(6)
+	style.bg_color = Color.BLACK
 	_end_panel.add_theme_stylebox_override("panel", style)
 	_end_panel.visible = false
 	# Its own layer above the location-name overlay (10) so nothing covers it.
@@ -589,9 +583,11 @@ func _build_ui() -> void:
 	end_layer.layer = 11
 	add_child(end_layer)
 	end_layer.add_child(_end_panel)
+	var end_center := CenterContainer.new()
+	_end_panel.add_child(end_center)
 	var end_box := VBoxContainer.new()
-	end_box.add_theme_constant_override("separation", 12)
-	_end_panel.add_child(end_box)
+	end_box.add_theme_constant_override("separation", 16)
+	end_center.add_child(end_box)
 	_end_title = Label.new()
 	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_title.add_theme_font_size_override("font_size", 72)
@@ -609,7 +605,7 @@ func _build_ui() -> void:
 	_wasted.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_wasted.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_wasted.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_wasted.custom_minimum_size = crop.region.size * 2.0
+	_wasted.custom_minimum_size = crop.region.size * 3.0
 	_wasted.visible = false
 	end_box.add_child(_wasted)
 	_end_label = Label.new()
