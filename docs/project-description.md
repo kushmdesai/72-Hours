@@ -36,7 +36,7 @@ t_empty = R(t) / |dR/dt|
 t_survive = min(t_O, t_E, t_W, t_T)
 ```
 
-where `t_T` is the time until the temperature reaches the lowest safe limit. The HUD shows `t_survive` live, so the player sees right away how each decision moves their survival clock. The goal is to keep `t_survive ≥` the hours left until rescue.
+where `t_T` is the time until the temperature reaches the lowest safe limit. The HUD shows `t_survive` live, so the player sees right away how each decision moves their survival clock. The goal is to keep `t_survive ≥` the hours left until rescue. Because sunlight and heat loss change through the day, the rates are not really constant, so the game gets each `t_empty` by running the same Euler model forward from the current state (with the current switches) and finding when that resource crosses zero. With a constant drain this gives exactly `R / |dR/dt|`.
 
 **Moon physics.** The astronaut moves under `y'' = g_moon = 1.62 m/s²` (scaled at 32 px per metre), so the same push-off gives a jump about 6 times higher and longer than on Earth (9.81 / 1.62 ≈ 6).
 
