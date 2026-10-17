@@ -82,6 +82,9 @@ var running := true
 var time_scale := 1.0
 ## Set once the game is won or lost; the model no longer steps.
 var ended := false
+## While true the clock keeps going but the resources hold still and nothing
+## new breaks (set by DangerEvents while a calamity is passing).
+var frozen := false
 ## How many times each ice vein in the tunnels has been drilled, by vein name.
 var ice_drills := {}
 ## One entry per in-game hour: {hour, oxygen, energy, water, temperature, food}.
@@ -126,6 +129,7 @@ func reset() -> void:
 	ice_drills.clear()
 	history.clear()
 	ended = false
+	frozen = false
 	running = true
 	time_scale = 1.0
 	_invalidate_forecast()
@@ -147,12 +151,13 @@ func _process(delta: float) -> void:
 func step(dt: float) -> void:
 	if ended or dt <= 0.0:
 		return
-	var rates := rates()
-	oxygen += rates.oxygen * dt
-	energy += rates.energy * dt
-	water += rates.water * dt
-	temperature += rates.temperature * dt
-	food = minf(food + rates.food * dt, config.food_max)
+	if not frozen:
+		var rates := rates()
+		oxygen += rates.oxygen * dt
+		energy += rates.energy * dt
+		water += rates.water * dt
+		temperature += rates.temperature * dt
+		food = minf(food + rates.food * dt, config.food_max)
 
 	var previous_hour := int(hour)
 	hour += dt
@@ -160,7 +165,8 @@ func step(dt: float) -> void:
 		_record()
 		hour_passed.emit(h)
 
-	_roll_failures(dt)
+	if not frozen:
+		_roll_failures(dt)
 	updated.emit()
 	_check_end()
 

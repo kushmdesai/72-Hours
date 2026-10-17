@@ -101,6 +101,9 @@ func _process(delta: float) -> void:
 		_layer.visible = false
 		return
 	var h := Base.hour
+	# Resources hold still while a calamity passes, so sheltering in the
+	# tunnels can't run a tank dry or over its max.
+	Base.frozen = phase == "active"
 	match phase:
 		"calm":
 			if h >= arrive_hour - warning_hours:
@@ -109,6 +112,7 @@ func _process(delta: float) -> void:
 		"warning":
 			if h >= arrive_hour:
 				phase = "active"
+				Base.frozen = true
 				arrived.emit()
 				for f: String in KINDS[kind].damage:
 					if Base.FAILURE_SITES.has(f):
@@ -120,6 +124,7 @@ func _process(delta: float) -> void:
 				return
 			if h >= arrive_hour + duration_hours:
 				phase = "calm"
+				Base.frozen = false
 				arrive_hour = h + _rng.randf_range(gap_hours.x, gap_hours.y)
 				passed.emit()
 				# The other calamity comes next.
