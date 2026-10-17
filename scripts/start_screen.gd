@@ -63,7 +63,7 @@ func _build() -> void:
 		+ "Keep oxygen, battery, water and temperature in their safe ranges until it lands.",
 		18, Color(0.8, 0.85, 0.9)))
 	box.add_child(_label(
-		"A / D  move     W  jump     E  switch a system / hold to repair     F  fast-forward",
+		"A / D  move     W  jump     E  open a console / hold to repair     F  fast-forward",
 		16, Color(0.55, 0.65, 0.75)))
 	_hint = _label("Press Enter to start", 26, Color.WHITE)
 	box.add_child(_hint)

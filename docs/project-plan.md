@@ -24,7 +24,7 @@ Step-by-step build order. Each step ends with something playable, so the game st
 
 ## 5. Systems and switches (done)
 - `scripts/systems_controller.gd`: press E at a console to switch the oxygen generator, water recycler or heater; screens show green on, grey off, flashing red broken.
-- An interactable panel in each room (press E near it) to turn that system on or off.
+- Press E at a machine to open its screen (`scripts/system_panel.gd`): it pauses the game and shows that system's equation with the current numbers substituted, a legend of the symbols, an ON/OFF button, and a what-if graph and table that run the Euler model 24 h ahead with the machine ON vs OFF. Holding E at a broken machine still repairs it.
 - Each switch changes its `uᵢ` term in the equations, so the HUD reacts instantly.
 - Add the coupling: the oxygen generator uses water and energy, the heater uses energy.
 

@@ -2,11 +2,12 @@ class_name SystemsController
 extends Node2D
 ## Connects the Base model to the map: switches, repairs, alarms and the end screen.
 ##
-## Walk up to a system console in the Moonbase and press E to switch that system
-## on or off (its u_i term in the equations). The Solar Control console connects
+## Walk up to a system console in the Moonbase and press E to open its screen
+## (SystemPanel), which shows that system's equations with live numbers and
+## switches it on or off (its u_i term in the equations). The Solar Control console connects
 ## or disconnects the panels, to stop a full battery overcharging. When something has failed, hold E
-## at the console (or at any solar panel for dust) to repair it. Console screens
-## show green = on, grey = off, flashing red = broken.
+## at the console (or at any solar panel for dust) to repair it. Each machine's
+## sprite shows its on, off or broken art.
 ##
 ## It also runs the feel of the game: hold F to fast-forward quiet stretches,
 ## supply pods to jump for (SupplyDrops), warnings with a hint when a resource
@@ -68,6 +69,7 @@ var _danger := false
 var _shake := 0.0
 var _ff_blocked := false
 var _repairs := 0
+var _panel_closed_frame := -10
 
 
 func _ready() -> void:
@@ -146,11 +148,11 @@ func _handle_input(delta: float) -> void:
 	elif _target_site in Base.SYSTEMS:
 		_repair_progress = 0.0
 		var on: bool = Base.switches[_target_site]
-		if Input.is_action_just_pressed("interact"):
-			Base.toggle_system(_target_site)
-			on = not on
-		text = "%s: %s\nE to switch %s" % [
-			SYSTEM_LABELS[_target_site].capitalize(), "ON" if on else "OFF", "off" if on else "on"]
+		if Input.is_action_just_pressed("interact") and Engine.get_process_frames() > _panel_closed_frame + 1:
+			_open_panel(_target_site)
+			return
+		text = "%s: %s\nE to open the console" % [
+			SYSTEM_LABELS[_target_site].capitalize(), "ON" if on else "OFF"]
 		if _target_site == "solar":
 			text += "\nSolar %.1f kW, draw %.1f kW" % [Base.solar_power(), Base.power_draw()]
 			if Base.failures.has("dust"):
@@ -162,6 +164,16 @@ func _handle_input(delta: float) -> void:
 	_prompt.text = text
 	_prompt.visible = true
 	_prompt.global_position = _target.global_position + Vector2(-_prompt.size.x / 2.0, -110.0)
+
+
+## Open the machine screen (scripts/system_panel.gd), which pauses the game.
+func _open_panel(site: String) -> void:
+	_prompt.visible = false
+	var panel := SystemPanel.new(site)
+	panel.closed.connect(func() -> void:
+		_panel_closed_frame = Engine.get_process_frames()
+		_update_visuals())
+	add_child(panel)
 
 
 func _update_visuals() -> void:
