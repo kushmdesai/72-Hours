@@ -606,12 +606,23 @@ func _build_ui() -> void:
 	_wasted.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_wasted.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_wasted.custom_minimum_size = crop.region.size * 3.0
+	_wasted.modulate.a = 0.6
 	_wasted.visible = false
 	end_box.add_child(_wasted)
 	_end_label = Label.new()
 	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_label.add_theme_font_size_override("font_size", 20)
-	end_box.add_child(_end_label)
+	# The run's numbers sit in their own box under the title.
+	var data_box := PanelContainer.new()
+	var data_style := StyleBoxFlat.new()
+	data_style.bg_color = Color(0.04, 0.06, 0.1)
+	data_style.border_color = Color(0.3, 0.36, 0.45)
+	data_style.set_border_width_all(2)
+	data_style.set_corner_radius_all(6)
+	data_style.set_content_margin_all(24)
+	data_box.add_theme_stylebox_override("panel", data_style)
+	data_box.add_child(_end_label)
+	end_box.add_child(data_box)
 
 
 func _ensure_input_actions() -> void:
