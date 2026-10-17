@@ -126,8 +126,8 @@ metadata/broken_texture = ExtResource("8_water_broken")
 
 [node name="Machine" type="Sprite2D" parent="Rooms/WaterRecycler/Console"]
 texture_filter = 1
-position = Vector2(0, -27)
-scale = Vector2(3, 3)
+position = Vector2(0, -81)
+scale = Vector2(9, 9)
 texture = ExtResource("7_water_off")
 
 [node name="Heater" type="Node2D" parent="Rooms" unique_id=1066545928 groups=["rooms"]]
@@ -151,8 +151,8 @@ metadata/broken_texture = ExtResource("5_heater_broken")
 
 [node name="Machine" type="Sprite2D" parent="Rooms/Heater/Console"]
 texture_filter = 1
-position = Vector2(-3, -36)
-scale = Vector2(3, 3)
+position = Vector2(-9, -108)
+scale = Vector2(9, 9)
 texture = ExtResource("4_heater_off")
 
 [node name="Habitat" type="Node2D" parent="Rooms" unique_id=49911928 groups=["rooms"]]
