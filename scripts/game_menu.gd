@@ -56,6 +56,13 @@ func open_load_from_title() -> void:
 	_show_slots(false)
 
 
+## Open straight on the settings page, over the start screen.
+func open_settings_from_title() -> void:
+	_from_title = true
+	visible = true
+	_show_settings()
+
+
 func _resume() -> void:
 	visible = false
 	get_tree().paused = false
@@ -74,6 +81,7 @@ func _show_main() -> void:
 	_add_button("Resume", _resume)
 	_add_button("Save game", _show_slots.bind(true))
 	_add_button("Load game", _show_slots.bind(false))
+	_add_button("Settings", _show_settings)
 	_add_button("Restart", _restart)
 	_add_button("Quit", func() -> void: get_tree().quit())
 	_focus_first()
@@ -88,6 +96,55 @@ func _show_slots(saving: bool) -> void:
 		var b := _add_button(text, _on_slot.bind(slot, saving))
 		b.disabled = not saving and not SaveGame.exists(slot)
 	_add_button("Back", _close if _from_title else _show_main)
+	_focus_first()
+
+
+func _show_settings() -> void:
+	_clear()
+	_title.text = "SETTINGS"
+	_note.text = "Saved automatically.  F11 full screen,  N sound"
+	_add_button("Sound effects: %s" % ("ON" if Settings.sound_on else "OFF"), func() -> void:
+		Settings.set_sound_on(not Settings.sound_on)
+		_show_settings())
+	var vol := HSlider.new()
+	vol.min_value = 0.0
+	vol.max_value = 1.0
+	vol.step = 0.05
+	vol.value = Settings.volume
+	vol.custom_minimum_size = Vector2(420, 28)
+	vol.value_changed.connect(func(v: float) -> void:
+		Settings.set_volume(v)
+		Sfx.play("click"))
+	var vol_label := Label.new()
+	vol_label.text = "Volume"
+	vol_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_box.add_child(vol_label)
+	_box.add_child(vol)
+	_add_button("Full screen: %s" % ("ON" if Settings.fullscreen else "OFF"), func() -> void:
+		Settings.set_fullscreen(not Settings.fullscreen)
+		_show_settings())
+	_add_button("Background: %s" % Settings.background_name(), func() -> void:
+		Settings.next_background()
+		_show_settings())
+	_add_button("Creator notes", _show_notes)
+	_add_button("GitHub page", Settings.open_github)
+	_add_button("Back", _close if _from_title else _show_main)
+	_focus_first()
+
+
+func _show_notes() -> void:
+	_clear()
+	_title.text = "CREATOR NOTES"
+	_note.text = ""
+	var notes := Label.new()
+	notes.text = ("Moonbase: 72 Hours was made by Mahesh and team for Math Hacks 2.0.\n"
+		+ "Every machine runs on rate equations, and the debrief at the end\n"
+		+ "graphs how each resource changed over the run.\n\n"
+		+ "(Placeholder: edit these notes in scripts/game_menu.gd.)")
+	notes.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notes.add_theme_font_size_override("font_size", 18)
+	_box.add_child(notes)
+	_add_button("Back", _show_settings)
 	_focus_first()
 
 

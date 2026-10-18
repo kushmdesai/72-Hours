@@ -70,6 +70,11 @@ func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 func set_muted(on: bool) -> void:
 	muted = on
 	AudioServer.set_bus_mute(0, on)
+	# Remember it with the other settings (scripts/settings.gd).
+	var settings := get_node_or_null("/root/Settings")
+	if settings and settings.sound_on == on:
+		settings.sound_on = not on
+		settings.save()
 	_notice.text = "Sound off  (N)" if on else "Sound on  (N)"
 	var tween := create_tween()
 	_notice.modulate.a = 1.0
