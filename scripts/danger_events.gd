@@ -389,10 +389,22 @@ func _move_meteors() -> void:
 		var node: TextureRect = m.node
 		node.position += m.velocity * _dt
 		node.visible = not out_of_sight
+	# Rocks strike the ground (y = 0 in the location) instead of falling
+	# through it: each one bursts into a puff of dust where it lands.
+	var ground_y := 700.0
+	if main.current:
+		ground_y = (main.current.get_global_transform_with_canvas() * Vector2.ZERO).y
 	var gone := _meteors.filter(func(m: Dictionary) -> bool:
-		return m.node.position.y > 700.0 or m.node.position.x < -150.0)
+		var node: TextureRect = m.node
+		return node.position.y + node.size.y * node.scale.y * 0.8 >= ground_y \
+				or node.position.x < -150.0)
 	for m: Dictionary in gone:
-		m.node.queue_free()
+		var node: TextureRect = m.node
+		if node.visible and node.position.x >= -150.0:
+			var puff := ImpactPuff.new()
+			puff.position = Vector2(node.position.x + node.size.x * node.scale.x * 0.5, ground_y)
+			_layer.add_child(puff)
+		node.queue_free()
 		_meteors.erase(m)
 
 
@@ -442,3 +454,28 @@ func _build() -> void:
 
 func _fmt(h: float) -> String:
 	return "%dh %02dm" % [int(h), int(fmod(h, 1.0) * 60.0)]
+
+
+## A puff of moon dust thrown up where a falling rock hits the ground.
+class ImpactPuff:
+	extends Control
+	const LIFE := 0.6
+	var _age := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(delta: float) -> void:
+		_age += delta
+		if _age >= LIFE:
+			queue_free()
+			return
+		queue_redraw()
+
+	func _draw() -> void:
+		var k := _age / LIFE
+		var a := 1.0 - k
+		draw_circle(Vector2(0, -6), 10.0 + 34.0 * k, Color(0.75, 0.72, 0.68, 0.55 * a))
+		draw_circle(Vector2(-18.0 * k - 6.0, -4), 6.0 + 18.0 * k, Color(0.6, 0.58, 0.55, 0.5 * a))
+		draw_circle(Vector2(18.0 * k + 6.0, -4), 6.0 + 18.0 * k, Color(0.6, 0.58, 0.55, 0.5 * a))
+		draw_circle(Vector2.ZERO, 8.0 * a, Color(1.0, 0.75, 0.4, a))

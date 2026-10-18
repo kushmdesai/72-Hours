@@ -59,6 +59,8 @@ const MACHINE_BROKEN_TINT := Color(1.0, 0.45, 0.4)
 const DRILLED_TINT := Color(0.35, 0.35, 0.4)
 ## Glow of the coal generator's firebox while it burns.
 const COAL_GLOW := Color(1.0, 0.55, 0.15)
+## Machines iced over while the base is shut down for a calamity.
+const FROZEN_TINT := Color(0.55, 0.8, 1.0)
 
 var _player: Node2D
 var _target: Node2D
@@ -221,6 +223,12 @@ func _handle_input(delta: float) -> void:
 		_show_prompt("CONTROL PANEL\n" + _dangers.status_text())
 		return
 	var site := "solar" if _target_site == "panel" else _target_site
+	# The machines are frozen while the base is shut down for a calamity:
+	# no switching or repairs until it passes.
+	if Base.frozen and (site in Base.SYSTEMS):
+		_repair_progress = 0.0
+		_show_prompt("%s: FROZEN\nSystems shut down until the calamity passes" % SYSTEM_LABELS[site].capitalize())
+		return
 	var broken := Base.failures_at(site)
 	var text := ""
 
@@ -358,7 +366,9 @@ func _update_visuals() -> void:
 		var screen := console.get_node_or_null("Screen") as ColorRect
 		if not screen:
 			continue
-		if Base.failures_at(site).size() > 0:
+		if Base.frozen:
+			screen.color = FROZEN_TINT
+		elif Base.failures_at(site).size() > 0:
 			screen.color = COLOR_BROKEN if flash else COLOR_OFF
 		elif site == "coal":
 			screen.color = COAL_GLOW if Base.coal_running() else COLOR_OFF
@@ -380,6 +390,8 @@ func _update_visuals() -> void:
 	var dusty := Base.failures.has("dust")
 	for panel: Node2D in get_tree().get_nodes_in_group("solar_panels"):
 		panel.modulate = DUST_TINT if dusty else Color.WHITE
+		if Base.frozen:
+			panel.modulate *= FROZEN_TINT
 
 
 ## Consoles drawn as a sprite swap between their on, off and broken art
@@ -398,6 +410,8 @@ func _update_machine(console: Node2D, machine: Sprite2D, site: String) -> void:
 		machine.modulate = MACHINE_OFF_TINT
 	elif state == "broken":
 		machine.modulate = MACHINE_BROKEN_TINT if _blink < 0.5 else Color.WHITE
+	if Base.frozen:
+		machine.modulate = FROZEN_TINT
 
 
 func _update_alert() -> void:
