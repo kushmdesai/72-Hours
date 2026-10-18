@@ -1,6 +1,8 @@
 # How the code works
 
-*Moonbase: 72 Hours* is a 2D side-scroller made in Godot 4 with GDScript. Under the game sits one mathematical model of the base's life support, and almost every other script either feeds that model (switches, repairs, supplies, calamities) or shows it to the player (HUD, machine screens, alerts). This document walks through how the pieces fit. For the equations themselves and why they were chosen, see [math.md](math.md).
+*Moonbase: 72 Hours* is a 2D side-scroller made in Godot 4 with GDScript. Under the game sits one mathematical model of the base's life support, and almost every other script either feeds that model (switches, repairs, supplies, calamities) or shows it to the player (HUD, machine screens, alerts). This document walks through how the pieces fit. Each section opens with **the idea** in plain words, then gives the details: which script does what, the functions involved and how they talk to each other. For the equations themselves and why they were chosen, see [math.md](math.md).
+
+**If you read only one paragraph:** think of the game as a **puppet theatre**. Backstage there is a calculator, `Base`, that knows the five numbers keeping the astronaut alive (oxygen, battery, water, temperature, food) and the rules for how they change each hour. Everything you see on stage, the rooms, the machines, the bars at the bottom, is a puppet whose strings are tied to that calculator: the bars read its numbers, the machines show its switches, and when you press E at a console you are reaching backstage and flipping one of its switches. Sixty times a second the calculator moves its numbers forward a little, and every puppet updates to match.
 
 ## Contents
 
@@ -28,6 +30,8 @@
 
 ## 1. The big picture
 
+> **The idea:** there are three layers. The **model** (`Base`) does the maths and nothing else. The **controllers** turn what the player does and what happens in the world (pressing E, a pod landing, a black hole arriving) into calls on the model. The **displays** read the model and draw it. Information flows in a loop: input → model → screen → player → input.
+
 ```
                  ┌──────────────────────────────────────────┐
                  │  Base (autoload, scripts/base.gd)         │
@@ -46,9 +50,11 @@
  └──────────────────────────┘     └────────────────────────────┘
 ```
 
-The design rule is that **the model knows nothing about the screen**. `Base` holds numbers and equations only. Everything visual reads from it, and everything the player does goes through a small set of methods on it (`set_system`, `repair`, `add_supplies`, `drill_ice`, `trigger_failure`). This keeps the math in one file that can be tested on its own (see the [balance test](#15-the-balance-test)).
+The design rule is that **the model knows nothing about the screen**. `Base` holds numbers and equations only. Everything visual reads from it, and everything the player does goes through a small set of methods on it (`set_system`, `repair`, `add_supplies`, `drill_ice`, `trigger_failure`). It's the same idea as a calculator app: the buttons and the display can be redesigned without touching the arithmetic underneath. This keeps the math in one file that can be tested on its own (see the [balance test](#17-the-balance-test)).
 
 ## 2. Project layout
+
+> **The idea:** `scenes/` holds things you can see (built in the Godot editor), `scripts/` holds the behaviour (GDScript code attached to those scenes or created in code), and `data/base_config.tres` holds the numbers. Almost every script is one self-contained job, named after that job.
 
 | Path | What it is |
 |---|---|
@@ -85,6 +91,8 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 
 ## 3. Startup and the scene tree
 
+> **The idea:** a Godot game is a **tree of nodes**, like folders inside folders. A few nodes (the *autoloads*) are created first and live for the whole session, the way a theatre's lighting desk stays put while the scenery changes. Then the main scene is built, and it adds the rest of the cast in code.
+
 1. Godot loads the **autoloads** before any scene. `Base`'s `_ready()` loads `data/base_config.tres` (falling back to a default `BaseConfig` if the file is missing) and calls `reset()` to set the starting values. `Sfx` builds its sounds and connects to `Base`'s signals. `Settings` loads the player's saved settings and applies the sound and full-screen ones straight away.
 2. The main scene `scenes/main.tscn` loads. Its root node runs `scripts/main.gd`, whose `_ready()` creates three more nodes in code:
    - `SystemsController`, which in turn creates `SupplyDrops`, `DangerEvents` and `MathDebrief` as its children,
@@ -117,11 +125,15 @@ root
     └── Tutorial             (only in a tutorial run)
 ```
 
-**Pausing.** Godot's `get_tree().paused` stops every node whose `process_mode` is `PAUSABLE`. `Base`, `SupplyDrops` and `DangerEvents` are pausable, so the clock stops. The title screen, the pause menu, the machine screens and `SystemsController` are `ALWAYS`, so they keep reacting to keys while the world is frozen.
+**Pausing.** Think of pausing as freezing everything except the people allowed to keep talking. Godot's `get_tree().paused` stops every node whose `process_mode` is `PAUSABLE`. `Base`, `SupplyDrops` and `DangerEvents` are pausable, so the clock stops. The title screen, the pause menu, the machine screens and `SystemsController` are `ALWAYS`, so they keep reacting to keys while the world is frozen.
 
 ## 4. The model: `Base` (scripts/base.gd)
 
 `Base` is the heart of the game. It is an autoload, so any script can write `Base.oxygen` or `Base.repair("dust")`.
+
+> **The idea:** `Base` is a spreadsheet that updates itself. It has a row of current values (how much oxygen, water, …), a row of switches (which machines are on), a formula for how fast each value is changing (`rates_at`), and a clock. Every frame it reads the formulas, nudges each value by "rate × a sliver of time", checks nobody has died, and tells the HUD the new numbers. It can also run the same spreadsheet forward on a scratch copy to ask "if nothing changes, when does something run out?"
+
+
 
 ### State
 
@@ -208,6 +220,8 @@ At the end of each `_process`, `_push_to_hud()` finds the node in group `"hud"` 
 
 ## 5. All the numbers: `BaseConfig`
 
+> **The idea:** every constant in the model (how big the solar panels are, how much you breathe, how often things break) lives in one settings file instead of being scattered through the code, like a recipe card kept separate from the cooking. To rebalance the game you change the card, not the cook.
+
 `scripts/base_config.gd` declares a `Resource` class with one `@export` variable per constant, grouped by equation (Clock, Starting values, Safe ranges, Oxygen, Energy, Water, Temperature, Food, Ice mining, Trading, Coal, Day and night, Failures). Each group's heading is the equation it feeds, and each variable's comment gives its symbol and unit.
 
 `data/base_config.tres` is an instance of that class. It currently stores no overrides, so every value is the default written in the `.gd` file, but opening the `.tres` in the Godot inspector lets you rebalance the whole game with sliders without touching code.
@@ -215,6 +229,8 @@ At the end of each `_process`, `_push_to_hud()` finds the node in group `"hud"` 
 The safe ranges follow a naming convention, `<resource>_min` and `<resource>_max`, so `Base.min_of("water")` is just `config.get("water_min")`.
 
 ## 6. The world: locations, doors and travel
+
+> **The idea:** the world is four separate "rooms" (scenes), and only the one you're standing in is loaded at a time. Walking off the edge of one swaps it for the next, like turning the page of a comic. The model doesn't care where you are, so the base keeps running no matter which page is showing.
 
 ### Locations
 
@@ -245,16 +261,20 @@ The exit point is the airlock door on that side if the location has one (an `Air
 
 ### Day and night on screen
 
+> **The idea:** the brightness of the ground *is* the solar-power graph. When the panels get 50% of their peak sunlight, the world is drawn halfway between its night colour and full colour, and the sun sits at the matching height in the sky.
+
 `DayNight` (`scripts/day_night.gd`, a node in `scenes/main.tscn`) makes the sunlight term `S(t)` visible. Every frame it reads `Base.sunlight()` and sets a `CanvasModulate` to `NIGHT_TINT.lerp(white, S(t)/S_peak)`, so the ground and the base are full colour at noon, a dim blue at night, and in between exactly as bright as the sunlight the solar panels are getting. The sky is not tinted, because the Moon has no atmosphere: `DayNight` divides the tint back out of the stars and the sun so they stay the same day and night, and the starfield uses additive blending so it reads as light on black.
 
 A sun sprite rides across the screen on the same angle `θ = 2π(t + φ)/P` that `S(t)` takes the sine of. It moves left to right as `θ` goes from 0 to π, its height above the horizon is proportional to `sin θ`, and it is hidden while `θ > π` (night). It sits in front of the stars but behind the backdrop and ground, so it sinks behind the hills as it sets.
 
 ## 7. The astronaut: `Player`
 
+> **The idea:** the astronaut obeys real projectile physics, just with the Moon's weaker gravity, so jumps are about six times higher and floatier than on Earth. A couple of small tricks (a jump pressed a moment too early or too late still counts) make it feel fair to play.
+
 `scripts/player.gd` is a `CharacterBody2D` whose tunables are all in SI units (metres, seconds) and multiplied by `pixels_per_meter` when applied. Each physics frame it:
 
 1. adds gravity `g = 1.62 m/s²` to the vertical velocity while airborne,
-2. starts a jump at `v₀ = 3.13 m/s` if jump was pressed recently (a 0.12 s **jump buffer**) and the player was on the ground recently (0.12 s of **coyote time**),
+2. starts a jump at `v₀ = 3.13 m/s` if jump was pressed recently (a 0.12 s **jump buffer**, so pressing jump just before landing still works) and the player was on the ground recently (0.12 s of **coyote time**, so you can still jump just after running off a ledge, like a cartoon coyote hanging in mid-air),
 3. halves the upward speed if jump is released early, for variable jump height,
 4. accelerates horizontally towards the target speed with different rates on the ground, while braking and in the air (less grip in low gravity),
 5. slows to a quarter speed while `Base.frozen` is true,
@@ -264,9 +284,11 @@ A sun sprite rides across the screen on the same angle `θ = 2π(t + φ)/P` that
 
 ## 8. The glue: `SystemsController`
 
+> **The idea:** `SystemsController` is the stage manager. It watches where the astronaut is standing, decides what pressing E means there (open a screen, repair, drill, dig, climb a ladder), passes the request to `Base`, and then makes the stage react: machine sprites change, alarms flash, the camera shakes, messages pop up.
+
 `scripts/systems_controller.gd` connects the model to the map and runs most of the game feel. Every frame it:
 
-- **Finds a target.** It looks for the nearest console, solar panel, hatch, control panel or ice vein within `reach_px` (48 px) of the player, horizontally.
+- **Finds a target.** It looks for the nearest console, solar panel, hatch, control panel, ice vein or coal seam within `reach_px` (48 px) of the player, horizontally. (The trade terminal and the rescue ship check for the player themselves.)
 - **Handles input on that target.** Anything that needs E held (repairing, drilling, packing) fills a small completion bar under the prompt.
   - At a **broken** machine (or any solar panel when the panels are dusty), holding E fills a repair bar over `repair_seconds` (2 s), then calls `Base.repair()`.
   - At a **working** machine, pressing E opens its `SystemPanel`.
@@ -286,9 +308,13 @@ The score is `10 × hours survived + 40 × repairs + 60 × pods collected + 1000
 
 ### The coal generator
 
+> **The idea:** the coal generator is a backup power bank for the night that you refill by hand. It only runs while it has coal, and it switches itself off when the hopper is empty.
+
 Coal is a second power source for the night. The generator sits in the Ice Tunnels next to three seams of 8 kg each. Switched on at its console, it adds `P_c = 3 kW` to the battery and burns `b = 1 kg/h` from its 12 kg hopper; when the hopper empties, `u_coal` drops to 0 by itself and the generator stops. The HUD's systems panel lists it as "Coal gen", showing +3.0 kW while it burns or the kg left in the hopper while it doesn't, and the net power includes it. Coal and the seams' progress are saved with the run.
 
 ## 9. Machine screens: `SystemPanel`
+
+> **The idea:** each machine has a "control screen" that shows its maths with today's numbers plugged in, and a preview of two possible futures, one with the machine ON and one with it OFF, so you can see what a switch will do before you flip it.
 
 Pressing E at a working console creates a `SystemPanel` (`scripts/system_panel.gd`), a `CanvasLayer` that pauses the game and shows:
 
@@ -300,6 +326,8 @@ Pressing E at a working console creates a `SystemPanel` (`scripts/system_panel.g
 E or Esc closes the screen and unpauses.
 
 ## 10. The HUD
+
+> **The idea:** the HUD is the dashboard. Each bar is a fuel gauge with red zones at both ends, and under it is a speedometer (the rate per hour) and a countdown ("how long until this hits a red zone"). The big clock compares the shortest countdown with the time until rescue: if it's longer, you're on track.
 
 `scripts/hud.gd` builds its whole layout in code (`_build()`): a strip along the bottom with one card per resource and a survival card, plus a systems panel.
 
@@ -314,6 +342,8 @@ The systems panel lists each system with ON, OFF or BROKEN and its power, the ne
 The HUD is deliberately loosely coupled: it only receives numbers through `set_resource` and `set_clock`. If `Base` is missing it runs a `demo` mode with placeholder values, and if no forecast is passed in it falls back to a straight-line estimate `(R − min)/|rate|`.
 
 ## 11. Supply pods
+
+> **The idea:** every so often a care package parachutes onto the Landing Pad. It's more likely to contain what you're short of, it hangs high enough that you have to jump for it, and it won't open if you have no room for what's inside.
 
 `SupplyDrops` (`scripts/supply_drops.gd`) drops a pod every 5 to 9 in-game hours (uniformly random) onto the Landing Pad, within 6 m of the `ShipLandingPoint`, hanging 2.6 to 4.4 m up under a parachute. The player has to jump into it before it drifts away after 8 hours.
 
@@ -334,6 +364,8 @@ Pods live as plain dictionaries in `pods`, independent of whichever location is 
 
 ## 12. Trading: coins for food, pods for coins
 
+> **The idea:** a market stall. Sell spare food for coins (the more you sell, the less each kilo fetches), then spend coins to order the care package you need right now instead of waiting for a random one.
+
 The Landing Pad has a TRADE terminal (`scripts/trade_terminal.gd`). Like the machine consoles, standing near it and pressing E opens a screen, here a `TradePanel` (`scripts/trade_panel.gd`), which pauses the game.
 
 - **Selling food.** Buttons sell 0.5, 1 or 2 kg from the pantry. Each calls `Base.sell_food(kg)`, which removes the food, adds the coins and raises `food_sold`. The market pays less the more you have sold: the price per kg is `p(s) = P0·qˢ` (20 coins, falling 10% per kg sold), and a sale is paid the area under that curve. The screen shows both formulas with the live numbers, plus a `PriceGraph` of the price curve with the next 1 kg sale shaded. [math.md](math.md#9-the-food-market-exponential-decay-and-an-integral) explains the math.
@@ -345,7 +377,9 @@ Coins, `food_sold` and the HUD's coin counter all live on `Base`, and the save f
 
 ## 13. Calamities
 
-`DangerEvents` (`scripts/danger_events.gd`) schedules big events that force the player underground. Three kinds take turns in a fixed order (black hole → alien UFO → asteroid shower), starting from a random one. Each is a small state machine:
+> **The idea:** a fire drill with real stakes. Every so often a disaster is announced hours ahead. You pack a lunchbox of air, water and food, carry it down to the ice tunnels, and wait it out underground while the base shuts down above you. Then you come back up and fix what it broke.
+
+`DangerEvents` (`scripts/danger_events.gd`) schedules big events that force the player underground. Three kinds take turns in a fixed order (black hole → alien UFO → asteroid shower), starting from a random one. Each is a small **state machine**: it is always in exactly one of a few named phases, and moves to the next when a condition is met, like a traffic light going green → amber → red:
 
 ```
 calm ──(6 h before arrival)──▶ warning ──(arrival)──▶ active ──(2 h later)──▶ calm
@@ -361,28 +395,42 @@ calm ──(6 h before arrival)──▶ warning ──(arrival)──▶ active
 
 ## 14. Rescue, the end screen and the math debrief
 
+> **The idea:** survive to hour 72 and the rescue ship lands; walk to it and board. Whether you win or lose, you can then open a "replay" of your run as graphs, one per resource, with the equation that shaped each curve.
+
 When `Base.hour` reaches `rescue_hours` (72) with everything in range, `Base` emits `game_won` and stops. The rescue rocket (`scripts/rescue_rocket.gd`, on the Landing Pad) has been descending for the last 1.5 hours. Once landed it waits, and `SystemsController` shows "walk up to it and press E to board". Boarding hides the player, lights the engine and launches the rocket; after 3.2 seconds it calls `rocket_departed()` on the controller, which shows the SURVIVED screen with the leftover resources and the score.
 
 From either end screen (SURVIVED or WASTED), M opens the **math debrief** (`scripts/math_debrief.gd`). It reads `Base.history` (one sample per in-game hour, plus the final moment) and draws one card per resource: a line graph of the whole run over its shaded safe range, the rate equation that drove it, its start, end, lowest and highest values, and the average rate `ΔR/Δt` over the run. A summary card gives hours survived, repairs and pods, and the breakdown math (`λ`, the expected number of breakdowns `λ·t`, and `P(≥1 in 24 h) = 1 − e^(−λ·24)`). M again closes it; R restarts.
 
 ## 15. Sound effects
 
+> **The idea:** there are no sound files. Every beep, thump and hum is calculated from maths when the game starts (a wave of a chosen shape and pitch, faded in and out), the way an old synthesiser builds sounds from scratch.
+
 `Sfx` (`scripts/sfx.gd`) is an autoload that makes every sound from code, with no audio files. At startup it builds each sound sample by sample into an `AudioStreamWAV`: tones whose pitch slides between two frequencies under an attack-then-exponential-decay envelope, bursts of filtered noise for thumps and rumbles, and a looping machine hum. It plays them through a pool of 8 `AudioStreamPlayer` voices.
 
-It hooks itself up so that no other script has to call it: it listens to `Base`'s signals (switches, failures, repairs, supplies, coins, game over, win) and to nodes as they enter the tree (the player for footsteps and landings, calamities and pods). Any script can still call `Sfx.play("coin")`. N mutes and unmutes.
+It hooks itself up so that no other script has to call it, like a sound engineer who watches the show and presses the right button at the right moment: it listens to `Base`'s signals (switches, failures, repairs, supplies, coins, game over, win) and to nodes as they enter the tree (the player for footsteps and landings, calamities and pods). Any script can still call `Sfx.play("coin")`. N mutes and unmutes.
 
 ## 16. Title screen, tutorial, menus, settings and saving
 
+> **The idea:** these are the doors in and out of a run: the title screen, a guided tutorial, the pause menu with settings, and save slots. A save is a snapshot of every number that changes during a run; loading rebuilds a fresh game and then pours the snapshot back in.
+
 - **`StartScreen`** pauses the game behind a title card until Enter, Space or a click. A static `started` flag stops it reappearing after a restart. L opens the load page, S the settings, and T starts the tutorial.
-- **`Tutorial`** (`scripts/tutorial.gd`) is a guided first run through the real game. T on the title screen sets `Tutorial.active`, resets `Base` and reloads the scene, and `main.gd` adds a `Tutorial` node on top. It sets `Base.running = false`, so the clock is stopped: nothing breaks, no pods fall and no calamity comes unless a step asks for it. A card in the top right gives one task at a time from its `STEPS` list and moves on as soon as the task is done. It checks progress in `_process` (distance walked, a jump that lands, passing the Heater room door, which location the player is in, coal in the hopper, packs carried and stocked), listens to signals (a `SystemPanel` or `TradePanel` entering the tree, `Base.system_toggled`, `Base.failure_repaired`, `Base.coins_changed` because the trade screen pauses the game, `Base.supplies_added` for drilled water, `SupplyDrops.pod_collected`, `DangerEvents.passed`), or waits for Enter on reading steps. It opens with a mission card (keep all five resources in range for 72 hours, then board the rescue ship), keeps that mission line on the card at every step, labels each step with its part (the base, the Landing Pad, the ice tunnels, surviving a calamity) and adds a "Why:" line saying how the skill helps you survive. The 26 steps go through every system once: moving, jumping (with the `h = v₀²/2g` and `t = 2v₀/g` numbers), doors, the heater's machine screen and its `uᵢ`, the HUD bars, systems panel, coins and survival clock, fast-forwarding (1.5 in-game hours), a repair (it breaks the heater on purpose with `Base.trigger_failure`), selling food at the trade terminal (`p(s) = 20·0.9ˢ`), buying a food pod and jumping to catch it, the hatch to the ice tunnels, digging coal, switching on the coal generator, drilling ice (the geometric series), and a calamity drill. For the drill it sets `DangerEvents.kind = "asteroids"` and `arrive_hour = hour + 4`, which starts the warning at once. The player packs two survival packs at the Control Panel (2 h, as long as the shower lasts), carries them to the tunnels, and holds F while the clock runs through the shutdown, the impacts and the all-clear. Then come a note on repairing the damage and a closing card on the goal, saving and the math debrief. While a machine or trade screen is open the card collapses to a one-line banner, on the HUD steps a blinking frame marks the part being described, and the card moves below the calamity banner while that shows. Q leaves at any time; finishing or leaving resets `Base` and goes back to the title screen.
+- **`Tutorial`** (`scripts/tutorial.gd`) is a guided first run through the real game, like a driving lesson in a real car with the instructor's foot on the brake.
+  - **How it starts.** T on the title screen sets `Tutorial.active`, resets `Base` and reloads the scene, and `main.gd` adds a `Tutorial` node on top. It sets `Base.running = false`, so the clock is stopped: nothing breaks, no pods fall and no calamity comes unless a step asks for it.
+  - **How a step works.** A card in the top right gives one task at a time from its `STEPS` list and moves on as soon as the task is done. It opens with a mission card (keep all five resources in range for 72 hours, then board the rescue ship), keeps that mission line on the card at every step, labels each step with its part (the base, the Landing Pad, the ice tunnels, surviving a calamity) and adds a "Why:" line saying how the skill helps you survive.
+  - **How it knows you did it.** It checks progress in `_process` (distance walked, a jump that lands, passing the Heater room door, which location the player is in, coal in the hopper, packs carried and stocked), listens to signals (a `SystemPanel` or `TradePanel` entering the tree, `Base.system_toggled`, `Base.failure_repaired`, `Base.coins_changed` because the trade screen pauses the game, `Base.supplies_added` for drilled water, `SupplyDrops.pod_collected`, `DangerEvents.passed`), or waits for Enter on reading steps.
+  - **What it covers.** The 26 steps go through every system once: moving, jumping (with the `h = v₀²/2g` and `t = 2v₀/g` numbers), doors, the heater's machine screen and its `uᵢ`, the HUD bars, systems panel, coins and survival clock, fast-forwarding (1.5 in-game hours), a repair (it breaks the heater on purpose with `Base.trigger_failure`), selling food at the trade terminal (`p(s) = 20·0.9ˢ`), buying a food pod and jumping to catch it, the hatch to the ice tunnels, digging coal, switching on the coal generator, drilling ice (the geometric series), and a calamity drill. Then come a note on repairing the damage and a closing card on the goal, saving and the math debrief.
+  - **The calamity drill.** It sets `DangerEvents.kind = "asteroids"` and `arrive_hour = hour + 4`, which starts the warning at once. The player packs two survival packs at the Control Panel (2 h, as long as the shower lasts), carries them to the tunnels, and holds F while the clock runs through the shutdown, the impacts and the all-clear.
+  - **Staying out of the way.** While a machine or trade screen is open the card collapses to a one-line banner, on the HUD steps a blinking frame marks the part being described, and the card moves below the calamity banner while that shows. Q leaves at any time; finishing or leaving resets `Base` and goes back to the title screen.
 - **`GameMenu`** opens on Esc or P (only if nothing else has paused the game) with Resume, Save, Load, Settings, Restart and Quit. Save and Load each show three slots. S on the title screen opens the Settings page directly (`open_settings_from_title()`), and its Back button then returns to the title.
 - **Settings.** The page in `GameMenu._show_settings()` has a sound on/off button, a volume slider (which plays a click as you drag it), a full-screen button, a Background button that cycles through four skies, a Creator notes page, and a GitHub page button that opens the repository in the browser. Each control calls the `Settings` autoload (`scripts/settings.gd`), which applies the change and writes `user://settings.cfg` immediately, so the choices carry over between runs:
   - **Sound** mutes `Sfx` and the master audio bus; **volume** sets the bus in decibels, `20·log₁₀(volume)` via `linear_to_db`, so half volume is about −6 dB.
   - **Full screen** switches the window mode (skipped in headless test runs). F11 toggles it from anywhere, and N still toggles sound in a run.
   - **Background** picks one of Starfield, Earthshine blue, Nebula purple or Deep space. Each is a top-to-bottom gradient painted into `Background/Space`, with the parallax starfield shown or hidden. `Settings` listens for the Main scene being added to the tree, so the chosen sky is reapplied after every restart or load.
-- **`SaveGame`** writes a `ConfigFile` to `user://save_<n>.cfg` holding everything that changes during a run: the model's clock, resources, switches, failures, ice veins, coins, food sold and history; the calamity phase, kind and schedule; the pods; the repair count; whether the ship is waiting; and the player's location and position. Loading stores the file in `SaveGame.pending`, resets `Base`, reloads the scene, and `GameMenu._ready()` applies the pending save once the fresh scene exists. This means a load always starts from a clean scene, exactly like a restart.
+- **`SaveGame`** writes a `ConfigFile` to `user://save_<n>.cfg` holding everything that changes during a run: the model's clock, resources, switches, failures, ice veins, coal and coal seams, coins, food sold and history; the calamity phase, kind and schedule; the pods; the repair count; whether the ship is waiting; and the player's location and position. Loading stores the file in `SaveGame.pending`, resets `Base`, reloads the scene, and `GameMenu._ready()` applies the pending save once the fresh scene exists. This means a load always starts from a clean scene, exactly like a restart.
 
 ## 17. The balance test
+
+> **The idea:** a robot plays the game a dozen times in a few seconds, with no graphics, following fixed strategies. If a lazy robot can win, the game is too easy; if a careful robot can't, it's too hard.
 
 `tests/balance_sim.gd` is a `SceneTree` script that runs without graphics:
 
@@ -393,6 +441,8 @@ godot --headless --script res://tests/balance_sim.gd
 It creates a `Base` with a fixed seed and plays the full 72 hours in steps of 0.01 h with several scripted strategies: do nothing, everything on, everything off, and a "careful" policy (thermostat-style rules for the heater, oxygen generator, solar disconnect and greenhouse), the last with and without failures and with fast or slow repairs. For each it prints whether it won or lost and the lowest and highest value each resource reached. This is how the constants in `BaseConfig` were tuned so that doing nothing loses, careless play loses, and careful play wins.
 
 ## 18. One frame, start to finish
+
+> **The idea:** a frame is one "tick" of the game, about 1/60 of a second. In each tick every script gets a turn to update its part, and the screen is redrawn.
 
 1. `Base._process` turns the frame's `delta` into in-game hours, takes an Euler step, rolls for failures, checks for the end, and pushes values, rates and forecasts to the HUD.
 2. `Player._physics_process` applies moon gravity and input and moves the astronaut.
@@ -406,7 +456,21 @@ It creates a `Base` with a fixed seed and plays the full 72 hours in steps of 0.
 
 (Godot runs these in tree order within each of its process and physics passes, so the exact order between scripts can differ slightly, but none of them depend on running before another in the same frame.)
 
+### Following one key press
+
+To see the layers working together, here is everything that happens when you walk up to the heater at night and switch it on:
+
+1. `SystemsController._find_target()` notices the heater console is the nearest thing within 48 px and shows "Heater: OFF, E to open the console".
+2. You press E. `_open_panel("heater")` creates a `SystemPanel`, which pauses the game and runs the model forward twice (heater ON and OFF) to draw its what-if graph: with the heater off the cabin is heading for 5 °C in a few hours; with it on it levels off near 35 °C.
+3. You press Space. The panel calls `Base.toggle_system("heater")`, which sets `switches.heater = true`, throws away the cached forecast and emits `system_toggled`.
+4. `Sfx` hears `system_toggled` and plays the switch-on sound. The panel redraws its equation with `u_heat = 1`.
+5. You close the panel and the game unpauses. On the next frame `Base.rates_at()` now includes `+H` in `dT/dt` and `−H` in `dE/dt`, so the temperature starts rising and the battery starts falling faster.
+6. `Base` re-runs its forecast, and `_push_to_hud()` hands the HUD the new rates and countdowns: the temperature card's countdown jumps from a few hours to far longer, the battery's countdown shortens, and the survival clock updates to whichever is now the weakest link.
+7. `SystemsController._update_visuals()` swaps the heater sprite to its "on" art.
+
 ## 19. How to change things
+
+> **The idea:** almost every change is "add a number to the settings file, add a term to the model, and give it something on screen". The model, the controllers and the displays are separate enough that you rarely need to touch all three at once.
 
 - **Change the market:** `food_price_start`, `food_price_ratio` and `pod_prices` in the Trading group of `BaseConfig`.
 - **Add a sound:** build it in `Sfx._build_sounds()` with `_tone` or `_noise`, then `Sfx.play("name")` or connect it to a signal in `Sfx._ready()`.
