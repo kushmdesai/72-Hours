@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/rescue_rocket.gd" id="r_script"]
 [ext_resource type="Texture2D" path="res://assests/character/rocket_fire.png" id="r_fire"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated Rocket (OFF).png" id="r_off"]
+[ext_resource type="Script" path="res://scripts/trade_terminal.gd" id="t_script"]
 
 [node name="LandingPad" type="Node2D" unique_id=1724174333]
 script = ExtResource("1_y0000")
@@ -69,6 +70,19 @@ offset_right = 256.0
 offset_bottom = -52.0
 theme_override_font_sizes/font_size = 16
 text = "← BASE"
+horizontal_alignment = 1
+
+[node name="TradeTerminal" type="Node2D" parent="." unique_id=902114377]
+position = Vector2(320, 0)
+script = ExtResource("t_script")
+
+[node name="Sign" type="Label" parent="TradeTerminal" unique_id=902114378]
+offset_left = -80.0
+offset_top = -136.0
+offset_right = 80.0
+offset_bottom = -116.0
+theme_override_font_sizes/font_size = 14
+text = "TRADE"
 horizontal_alignment = 1
 
 [node name="TunnelHatch" type="Node2D" parent="." unique_id=1650378245 groups=["hatches"]]

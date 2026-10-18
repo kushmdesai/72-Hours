@@ -36,6 +36,8 @@ signal game_over(resource: String, hour: float, too_high: bool)
 signal game_won
 ## A supply pod added `amount` to a resource.
 signal supplies_added(resource: String, amount: float)
+## The coin balance changed (food sold or a pod bought).
+signal coins_changed(coins: float)
 
 const CONFIG_PATH := "res://data/base_config.tres"
 const RESOURCES := ["oxygen", "energy", "water", "temperature", "food"]
@@ -87,6 +89,10 @@ var ended := false
 var frozen := false
 ## How many times each ice vein in the tunnels has been drilled, by vein name.
 var ice_drills := {}
+## Coins earned by selling food, spent on supply pods.
+var coins := 0.0
+## Kilograms of food sold so far this run; sets the market price.
+var food_sold := 0.0
 ## One entry per in-game hour: {hour, oxygen, energy, water, temperature, food}.
 var history: Array[Dictionary] = []
 
@@ -127,6 +133,8 @@ func reset() -> void:
 			"greenhouse": true}
 	failures.clear()
 	ice_drills.clear()
+	coins = 0.0
+	food_sold = 0.0
 	history.clear()
 	ended = false
 	frozen = false
@@ -447,6 +455,52 @@ func drill_ice(vein: String) -> float:
 	add_supplies("energy", -litres * config.ice_energy_per_litre)
 	add_supplies("water", litres)
 	return litres
+
+
+# --- Trading ----------------------------------------------------------------
+
+## p(s) = P0 * q^s: coins per kg for the next bit of food, after s kg sold.
+func food_price(sold: float = food_sold) -> float:
+	return config.food_price_start * pow(config.food_price_ratio, sold)
+
+
+## Coins for selling kg more food: the area under p(s) from s to s + kg,
+##   integral of P0*q^s ds = P0 * (q^s - q^(s+kg)) / -ln(q),
+## so a big sale is paid at the falling price all the way through it.
+func food_sale_value(kg: float, sold: float = food_sold) -> float:
+	var q := config.food_price_ratio
+	if is_equal_approx(q, 1.0):
+		return config.food_price_start * kg
+	return config.food_price_start * (pow(q, sold) - pow(q, sold + kg)) / -log(q)
+
+
+## Sell kg of food from the pantry (no more than there is) and return the coins.
+func sell_food(kg: float) -> float:
+	kg = minf(kg, food)
+	if kg <= 0.0:
+		return 0.0
+	var paid := food_sale_value(kg)
+	food -= kg
+	food_sold += kg
+	coins += paid
+	_invalidate_forecast()
+	coins_changed.emit(coins)
+	_check_end()
+	return paid
+
+
+func pod_price(kind: String) -> float:
+	return float(config.pod_prices.get(kind, INF))
+
+
+## Pay for a supply pod. Returns false (and spends nothing) if coins are short.
+func buy_pod(kind: String) -> bool:
+	var price := pod_price(kind)
+	if coins + 0.0001 < price:
+		return false
+	coins = maxf(coins - price, 0.0)
+	coins_changed.emit(coins)
+	return true
 
 
 ## Start a failure now (used by the Poisson roll, and handy for testing).

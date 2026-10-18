@@ -81,13 +81,20 @@ func hours_left(pod: Dictionary) -> float:
 	return maxf(lifetime_hours - (Base.hour - pod.landed_hour), 0.0)
 
 
-func _drop() -> void:
+## Send a pod of the given kind down to the Landing Pad now (bought with coins).
+func order(kind: String) -> void:
+	assert(KINDS.has(kind), "Unknown pod kind: %s" % kind)
+	_drop(kind)
+
+
+func _drop(kind: String = "") -> void:
 	var location: Location = load(SITE).instantiate()
 	var point := location.get_node_or_null("ShipLandingPoint") as Node2D
 	var center := point.position.x if point else location.width_px() / 2.0
 	location.free()
 	var spread := pad_half_width_m * Location.PIXELS_PER_METER
-	var kind := _pick_kind()
+	if kind == "":
+		kind = _pick_kind()
 	_next_id += 1
 	var pod := {
 		"id": _next_id,

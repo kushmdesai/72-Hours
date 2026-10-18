@@ -114,6 +114,20 @@ extends Resource
 ## A vein counts as empty once the next load would be smaller than this, in L.
 @export var ice_min_load: float = 0.2
 
+@export_group("Trading  price(s) = P0 * q^s")
+## P0: coins paid for the first kilogram of food sold.
+@export var food_price_start: float = 20.0
+## q: every kilogram sold so far multiplies the price by q, so the market
+## pays less the more you flood it (exponential decay in the amount sold).
+@export_range(0.5, 1.0) var food_price_ratio: float = 0.9
+## Coins to order a supply pod of each kind to the Landing Pad.
+@export var pod_prices: Dictionary = {
+	"oxygen": 30,
+	"water": 25,
+	"food": 25,
+	"toolkit": 45,
+}
+
 @export_group("Day and night  S(t) = S_peak * max(0, sin(2*pi*(t + phase)/period))")
 ## Length of one day/night cycle in in-game hours. A real lunar day lasts
 ## 29.5 Earth days; it is compressed so the 72 h game sees three nights.
