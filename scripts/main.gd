@@ -6,6 +6,8 @@ extends Node2D
 @export_file("*.tscn") var start_location: String = "res://scenes/locations/base.tscn"
 ## How far inside the new location the player appears, in pixels.
 @export var entry_margin: float = 24.0
+## How far inside an airlock door the player appears, in pixels.
+@export var door_margin: float = 40.0
 
 var current: Location
 var _tween: Tween
@@ -29,15 +31,40 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	var x := _player.position.x
-	if x > current.width_px() and current.right_exit != "":
+	if x > _exit_x("right") and current.right_exit != "":
 		_enter(current.right_exit)
-		_player.position.x = entry_margin
-	elif x < 0.0 and current.left_exit != "":
+		_player.position.x = _arrival_x("left")
+	elif x < _exit_x("left") and current.left_exit != "":
 		_enter(current.left_exit)
-		_player.position.x = current.width_px() - entry_margin
+		_player.position.x = _arrival_x("right")
 	else:
 		return
 	_camera.reset_smoothing()
+
+
+## Where the player leaves the current location on that side: through its
+## airlock door if it has one (AirlockDoor.exit_side), else off the map edge.
+func _exit_x(side: String) -> float:
+	var door := _exit_door(side)
+	if door:
+		return current.to_local(door.global_position).x
+	return 0.0 if side == "left" else current.width_px()
+
+
+## Where the player appears when coming in on that side: just inside its
+## airlock door if it has one, else just inside the map edge.
+func _arrival_x(side: String) -> float:
+	var door := _exit_door(side)
+	if door:
+		return current.to_local(door.global_position).x + (door_margin if side == "left" else -door_margin)
+	return entry_margin if side == "left" else current.width_px() - entry_margin
+
+
+func _exit_door(side: String) -> Node2D:
+	for door: Node2D in get_tree().get_nodes_in_group("exit_doors"):
+		if door.get("exit_side") == side and current.is_ancestor_of(door):
+			return door
+	return null
 
 
 ## Go straight to another location through a hatch or ladder, arriving at the

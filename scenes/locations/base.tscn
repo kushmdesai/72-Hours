@@ -63,6 +63,7 @@ texture = ExtResource("door_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("door_closed")
 open_texture = ExtResource("door_open")
+exit_side = "left"
 
 [node name="SolarControl" type="Node2D" parent="Rooms" unique_id=1058735545 groups=["rooms"]]
 position = Vector2(576, 0)
@@ -215,6 +216,7 @@ texture = ExtResource("door_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("door_closed")
 open_texture = ExtResource("door_open")
+exit_side = "right"
 
 [node name="RoomDoors" type="Node2D" parent="."]
 
