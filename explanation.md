@@ -19,7 +19,7 @@
 13. [Calamities](#13-calamities)
 14. [Rescue, the end screen and the math debrief](#14-rescue-the-end-screen-and-the-math-debrief)
 15. [Sound effects](#15-sound-effects)
-16. [Title screen, tutorial, menus and saving](#16-title-screen-tutorial-menus-and-saving)
+16. [Title screen, tutorial, menus, settings and saving](#16-title-screen-tutorial-menus-settings-and-saving)
 17. [The balance test](#17-the-balance-test)
 18. [One frame, start to finish](#18-one-frame-start-to-finish)
 19. [How to change things](#19-how-to-change-things)
@@ -52,7 +52,7 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 
 | Path | What it is |
 |---|---|
-| `project.godot` | Engine settings. Registers `Base` and `Sfx` as autoloads and sets `scenes/main.tscn` as the main scene. |
+| `project.godot` | Engine settings. Registers `Base`, `Sfx` and `Settings` as autoloads, sets `scenes/main.tscn` as the main scene, and opens a 1600×900 window. |
 | `scenes/main.tscn` | The root scene: background, starfield, the `Player` with its camera, the HUD and an overlay for fades. |
 | `scenes/hud.tscn` | A `CanvasLayer` that runs `scripts/hud.gd`. |
 | `scenes/locations/*.tscn` | The four areas: `solar_field`, `base`, `landing_pad`, `tunnels`. |
@@ -62,6 +62,7 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 | `scripts/main.gd` | Owns the current location and moves the player between them. |
 | `scripts/location.gd` | `Location`, the base class for each area scene. |
 | `scripts/player.gd` | `Player`, the astronaut with lunar physics. |
+| `scripts/day_night.gd` | `DayNight`, which shows the sunlight model as a tint on the world and a sun crossing the sky. |
 | `scripts/airlock_door.gd` | `AirlockDoor`, doors that open as you approach. |
 | `scripts/systems_controller.gd` | `SystemsController`: interaction, alerts, toasts, fast-forward, the end screen. |
 | `scripts/system_panel.gd` | `SystemPanel`, the pop-up machine screen with equations and a what-if graph. |
@@ -73,6 +74,7 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 | `scripts/rescue_rocket.gd` | The rescue ship's landing and take-off. |
 | `scripts/math_debrief.gd` | `MathDebrief`, the end-of-run graphs and equations (M on the end screen). |
 | `scripts/sfx.gd` | The `Sfx` autoload: every sound effect, synthesised in code. |
+| `scripts/settings.gd` | The `Settings` autoload: sound, volume, full screen and sky, saved between runs. |
 | `scripts/start_screen.gd` | `StartScreen`, the title screen. |
 | `scripts/tutorial.gd` | `Tutorial`, the guided first run (T on the title screen). |
 | `scripts/game_menu.gd` | `GameMenu`, the pause menu with save and load. |
@@ -83,7 +85,7 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 
 ## 3. Startup and the scene tree
 
-1. Godot loads the **autoloads** before any scene. `Base`'s `_ready()` loads `data/base_config.tres` (falling back to a default `BaseConfig` if the file is missing) and calls `reset()` to set the starting values. `Sfx` builds its sounds and connects to `Base`'s signals.
+1. Godot loads the **autoloads** before any scene. `Base`'s `_ready()` loads `data/base_config.tres` (falling back to a default `BaseConfig` if the file is missing) and calls `reset()` to set the starting values. `Sfx` builds its sounds and connects to `Base`'s signals. `Settings` loads the player's saved settings and applies the sound and full-screen ones straight away.
 2. The main scene `scenes/main.tscn` loads. Its root node runs `scripts/main.gd`, whose `_ready()` creates three more nodes in code:
    - `SystemsController`, which in turn creates `SupplyDrops`, `DangerEvents` and `MathDebrief` as its children,
    - `StartScreen`, which pauses the tree until the player presses Enter,
@@ -97,9 +99,11 @@ The resulting tree looks like this:
 root
 ├── Base                     (autoload, the model)
 ├── Sfx                      (autoload, sound effects)
+├── Settings                 (autoload, player settings)
 └── Main                     (main.gd)
     ├── <current Location>   (always child 0, swapped on travel)
     ├── Background, Stars
+    ├── DayNight             (day/night tint and the sun)
     ├── Player
     │   └── Camera2D
     ├── HUD                  (hud.gd, group "hud")
@@ -239,6 +243,12 @@ The exit point is the airlock door on that side if the location has one (an `Air
 
 `AirlockDoor` itself is tiny: each frame it swaps to its open texture when the player is within `open_distance` pixels.
 
+### Day and night on screen
+
+`DayNight` (`scripts/day_night.gd`, a node in `scenes/main.tscn`) makes the sunlight term `S(t)` visible. Every frame it reads `Base.sunlight()` and sets a `CanvasModulate` to `NIGHT_TINT.lerp(white, S(t)/S_peak)`, so the ground and the base are full colour at noon, a dim blue at night, and in between exactly as bright as the sunlight the solar panels are getting. The sky is not tinted, because the Moon has no atmosphere: `DayNight` divides the tint back out of the stars and the sun so they stay the same day and night, and the starfield uses additive blending so it reads as light on black.
+
+A sun sprite rides across the screen on the same angle `θ = 2π(t + φ)/P` that `S(t)` takes the sine of. It moves left to right as `θ` goes from 0 to π, its height above the horizon is proportional to `sin θ`, and it is hidden while `θ > π` (night). It sits in front of the stars but behind the backdrop and ground, so it sinks behind the hills as it sets.
+
 ## 7. The astronaut: `Player`
 
 `scripts/player.gd` is a `CharacterBody2D` whose tunables are all in SI units (metres, seconds) and multiplied by `pixels_per_meter` when applied. Each physics frame it:
@@ -361,11 +371,15 @@ From either end screen (SURVIVED or WASTED), M opens the **math debrief** (`scri
 
 It hooks itself up so that no other script has to call it: it listens to `Base`'s signals (switches, failures, repairs, supplies, coins, game over, win) and to nodes as they enter the tree (the player for footsteps and landings, calamities and pods). Any script can still call `Sfx.play("coin")`. N mutes and unmutes.
 
-## 16. Title screen, tutorial, menus and saving
+## 16. Title screen, tutorial, menus, settings and saving
 
-- **`StartScreen`** pauses the game behind a title card until Enter, Space or a click. A static `started` flag stops it reappearing after a restart. L opens the load page, and T starts the tutorial.
+- **`StartScreen`** pauses the game behind a title card until Enter, Space or a click. A static `started` flag stops it reappearing after a restart. L opens the load page, S the settings, and T starts the tutorial.
 - **`Tutorial`** (`scripts/tutorial.gd`) is a guided first run through the real game. T on the title screen sets `Tutorial.active`, resets `Base` and reloads the scene, and `main.gd` adds a `Tutorial` node on top. It sets `Base.running = false`, so the clock is stopped: nothing breaks, no pods fall and no calamity comes unless a step asks for it. A card in the top right gives one task at a time from its `STEPS` list and moves on as soon as the task is done. It checks progress in `_process` (distance walked, a jump that lands, passing the Heater room door, which location the player is in, coal in the hopper, packs carried and stocked), listens to signals (a `SystemPanel` or `TradePanel` entering the tree, `Base.system_toggled`, `Base.failure_repaired`, `Base.coins_changed` because the trade screen pauses the game, `Base.supplies_added` for drilled water, `SupplyDrops.pod_collected`, `DangerEvents.passed`), or waits for Enter on reading steps. It opens with a mission card (keep all five resources in range for 72 hours, then board the rescue ship), keeps that mission line on the card at every step, labels each step with its part (the base, the Landing Pad, the ice tunnels, surviving a calamity) and adds a "Why:" line saying how the skill helps you survive. The 26 steps go through every system once: moving, jumping (with the `h = v₀²/2g` and `t = 2v₀/g` numbers), doors, the heater's machine screen and its `uᵢ`, the HUD bars, systems panel, coins and survival clock, fast-forwarding (1.5 in-game hours), a repair (it breaks the heater on purpose with `Base.trigger_failure`), selling food at the trade terminal (`p(s) = 20·0.9ˢ`), buying a food pod and jumping to catch it, the hatch to the ice tunnels, digging coal, switching on the coal generator, drilling ice (the geometric series), and a calamity drill. For the drill it sets `DangerEvents.kind = "asteroids"` and `arrive_hour = hour + 4`, which starts the warning at once. The player packs two survival packs at the Control Panel (2 h, as long as the shower lasts), carries them to the tunnels, and holds F while the clock runs through the shutdown, the impacts and the all-clear. Then come a note on repairing the damage and a closing card on the goal, saving and the math debrief. While a machine or trade screen is open the card collapses to a one-line banner, on the HUD steps a blinking frame marks the part being described, and the card moves below the calamity banner while that shows. Q leaves at any time; finishing or leaving resets `Base` and goes back to the title screen.
-- **`GameMenu`** opens on Esc or P (only if nothing else has paused the game) with Resume, Save, Load, Restart and Quit. Save and Load each show three slots.
+- **`GameMenu`** opens on Esc or P (only if nothing else has paused the game) with Resume, Save, Load, Settings, Restart and Quit. Save and Load each show three slots. S on the title screen opens the Settings page directly (`open_settings_from_title()`), and its Back button then returns to the title.
+- **Settings.** The page in `GameMenu._show_settings()` has a sound on/off button, a volume slider (which plays a click as you drag it), a full-screen button, a Background button that cycles through four skies, a Creator notes page, and a GitHub page button that opens the repository in the browser. Each control calls the `Settings` autoload (`scripts/settings.gd`), which applies the change and writes `user://settings.cfg` immediately, so the choices carry over between runs:
+  - **Sound** mutes `Sfx` and the master audio bus; **volume** sets the bus in decibels, `20·log₁₀(volume)` via `linear_to_db`, so half volume is about −6 dB.
+  - **Full screen** switches the window mode (skipped in headless test runs). F11 toggles it from anywhere, and N still toggles sound in a run.
+  - **Background** picks one of Starfield, Earthshine blue, Nebula purple or Deep space. Each is a top-to-bottom gradient painted into `Background/Space`, with the parallax starfield shown or hidden. `Settings` listens for the Main scene being added to the tree, so the chosen sky is reapplied after every restart or load.
 - **`SaveGame`** writes a `ConfigFile` to `user://save_<n>.cfg` holding everything that changes during a run: the model's clock, resources, switches, failures, ice veins, coins, food sold and history; the calamity phase, kind and schedule; the pods; the repair count; whether the ship is waiting; and the player's location and position. Loading stores the file in `SaveGame.pending`, resets `Base`, reloads the scene, and `GameMenu._ready()` applies the pending save once the fresh scene exists. This means a load always starts from a clean scene, exactly like a restart.
 
 ## 17. The balance test
@@ -388,6 +402,7 @@ It creates a `Base` with a fixed seed and plays the full 72 hours in steps of 0.
 6. `SupplyDrops._process` drops, expires and collects pods.
 7. `DangerEvents._process` advances the calamity state machine and sets `Base.frozen`.
 8. `Hud._process` redraws the bars, clocks and systems panel from the numbers it was given.
+9. `DayNight._process` sets the world's tint from the sunlight and moves the sun.
 
 (Godot runs these in tree order within each of its process and physics passes, so the exact order between scripts can differ slightly, but none of them depend on running before another in the same frame.)
 
