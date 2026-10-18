@@ -19,7 +19,7 @@
 13. [Calamities](#13-calamities)
 14. [Rescue, the end screen and the math debrief](#14-rescue-the-end-screen-and-the-math-debrief)
 15. [Sound effects](#15-sound-effects)
-16. [Menus, saving and loading](#16-menus-saving-and-loading)
+16. [Title screen, tutorial, menus and saving](#16-title-screen-tutorial-menus-and-saving)
 17. [The balance test](#17-the-balance-test)
 18. [One frame, start to finish](#18-one-frame-start-to-finish)
 19. [How to change things](#19-how-to-change-things)
@@ -74,6 +74,7 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 | `scripts/math_debrief.gd` | `MathDebrief`, the end-of-run graphs and equations (M on the end screen). |
 | `scripts/sfx.gd` | The `Sfx` autoload: every sound effect, synthesised in code. |
 | `scripts/start_screen.gd` | `StartScreen`, the title screen. |
+| `scripts/tutorial.gd` | `Tutorial`, the guided first run (T on the title screen). |
 | `scripts/game_menu.gd` | `GameMenu`, the pause menu with save and load. |
 | `scripts/save_game.gd` | `SaveGame`, static helpers that write and read save files. |
 | `tests/balance_sim.gd` | A headless script that plays the model with fixed strategies. |
@@ -86,7 +87,8 @@ The design rule is that **the model knows nothing about the screen**. `Base` hol
 2. The main scene `scenes/main.tscn` loads. Its root node runs `scripts/main.gd`, whose `_ready()` creates three more nodes in code:
    - `SystemsController`, which in turn creates `SupplyDrops`, `DangerEvents` and `MathDebrief` as its children,
    - `StartScreen`, which pauses the tree until the player presses Enter,
-   - `GameMenu`, the hidden pause menu.
+   - `GameMenu`, the hidden pause menu,
+   - `Tutorial`, but only if the title screen started one (`Tutorial.active`).
 3. `main.gd` then loads the start location (`base.tscn`) and puts the player on its `PlayerStart` marker.
 
 The resulting tree looks like this:
@@ -107,7 +109,8 @@ root
     │   ├── DangerEvents
     │   └── MathDebrief      (hidden until M on the end screen)
     ├── StartScreen          (removed once the game starts)
-    └── GameMenu
+    ├── GameMenu
+    └── Tutorial             (only in a tutorial run)
 ```
 
 **Pausing.** Godot's `get_tree().paused` stops every node whose `process_mode` is `PAUSABLE`. `Base`, `SupplyDrops` and `DangerEvents` are pausable, so the clock stops. The title screen, the pause menu, the machine screens and `SystemsController` are `ALWAYS`, so they keep reacting to keys while the world is frozen.
@@ -358,9 +361,10 @@ From either end screen (SURVIVED or WASTED), M opens the **math debrief** (`scri
 
 It hooks itself up so that no other script has to call it: it listens to `Base`'s signals (switches, failures, repairs, supplies, coins, game over, win) and to nodes as they enter the tree (the player for footsteps and landings, calamities and pods). Any script can still call `Sfx.play("coin")`. N mutes and unmutes.
 
-## 16. Menus, saving and loading
+## 16. Title screen, tutorial, menus and saving
 
-- **`StartScreen`** pauses the game behind a title card until Enter, Space or a click. A static `started` flag stops it reappearing after a restart. L opens the load page.
+- **`StartScreen`** pauses the game behind a title card until Enter, Space or a click. A static `started` flag stops it reappearing after a restart. L opens the load page, and T starts the tutorial.
+- **`Tutorial`** (`scripts/tutorial.gd`) is a guided first run in the real Moonbase. T on the title screen sets `Tutorial.active`, resets `Base` and reloads the scene, and `main.gd` adds a `Tutorial` node on top. It sets `Base.running = false`, so the clock is stopped: nothing breaks, no pods fall and no calamity comes. A card in the top right gives one task at a time from its `STEPS` list and moves on as soon as the task is done. It checks progress in `_process` (distance walked, a jump that lands, passing the Heater room door), listens to signals (a `SystemPanel` entering the tree, `Base.system_toggled`, `Base.failure_repaired`), or waits for Enter on reading steps. The 12 steps cover moving, jumping (with the `h = v₀²/2g` and `t = 2v₀/g` numbers), doors, opening the heater's machine screen and flipping its `uᵢ`, the HUD bars, the systems panel and survival clock, fast-forwarding (the one step that lets the clock run, for 1.5 in-game hours), a repair (it breaks the heater on purpose with `Base.trigger_failure`), and short notes on trading, mining and calamities. While a machine screen is open the card collapses to a one-line banner, and on the HUD steps a blinking frame marks the part being described. Q leaves at any time; finishing or leaving resets `Base` and goes back to the title screen.
 - **`GameMenu`** opens on Esc or P (only if nothing else has paused the game) with Resume, Save, Load, Restart and Quit. Save and Load each show three slots.
 - **`SaveGame`** writes a `ConfigFile` to `user://save_<n>.cfg` holding everything that changes during a run: the model's clock, resources, switches, failures, ice veins, coins, food sold and history; the calamity phase, kind and schedule; the pods; the repair count; whether the ship is waiting; and the player's location and position. Loading stores the file in `SaveGame.pending`, resets `Base`, reloads the scene, and `GameMenu._ready()` applies the pending save once the fresh scene exists. This means a load always starts from a clean scene, exactly like a restart.
 
@@ -380,9 +384,10 @@ It creates a `Base` with a fixed seed and plays the full 72 hours in steps of 0.
 2. `Player._physics_process` applies moon gravity and input and moves the astronaut.
 3. `Main._physics_process` checks whether the player walked through an exit and swaps locations if so.
 4. `SystemsController._process` finds what the player is standing at, handles E, updates machine art, alerts, toasts, fast-forward, the vignette and camera shake.
-5. `SupplyDrops._process` drops, expires and collects pods.
-6. `DangerEvents._process` advances the calamity state machine and sets `Base.frozen`.
-7. `Hud._process` redraws the bars, clocks and systems panel from the numbers it was given.
+5. `Tutorial._process` (in a tutorial run only) checks whether the current task is done.
+6. `SupplyDrops._process` drops, expires and collects pods.
+7. `DangerEvents._process` advances the calamity state machine and sets `Base.frozen`.
+8. `Hud._process` redraws the bars, clocks and systems panel from the numbers it was given.
 
 (Godot runs these in tree order within each of its process and physics passes, so the exact order between scripts can differ slightly, but none of them depend on running before another in the same frame.)
 
