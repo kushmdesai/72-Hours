@@ -80,6 +80,7 @@ var _ff_blocked := false
 var _repairs := 0
 ## True once the rescue ship has landed and is waiting for the player to board.
 var _awaiting_boarding := false
+var _debrief: MathDebrief
 var _panel_closed_frame := -10
 
 
@@ -111,12 +112,19 @@ func _ready() -> void:
 	Base.game_over.connect(_on_game_over)
 	Base.game_won.connect(_on_game_won)
 	add_to_group("systems_controller")
+	_debrief = MathDebrief.new()
+	add_child(_debrief)
 
 
 func _process(delta: float) -> void:
 	if get_tree().paused:
 		if _end_panel.visible and Input.is_action_just_pressed("restart"):
 			_restart()
+		elif _end_panel.visible and Input.is_action_just_pressed("debrief"):
+			if _debrief.visible:
+				_debrief.close()
+			else:
+				_debrief.open(_repairs, _drops.collected)
 		return
 	_blink = fmod(_blink + delta, 1.0)
 	_update_visuals()
@@ -507,7 +515,7 @@ func _show_end(text: String, won: bool) -> void:
 	_end_title.text = "SURVIVED"
 	_end_title.visible = won
 	_wasted.visible = not won
-	_end_label.text = text + "\n\nPress R to try again"
+	_end_label.text = text + "\n\nM  math debrief: graphs and equations of your run\nR  try again"
 	_end_panel.visible = true
 	_prompt.visible = false
 	get_tree().paused = true
@@ -662,7 +670,7 @@ func _build_ui() -> void:
 
 
 func _ensure_input_actions() -> void:
-	var bindings := {"interact": KEY_E, "restart": KEY_R, "fast_forward": KEY_F}
+	var bindings := {"interact": KEY_E, "restart": KEY_R, "debrief": KEY_M, "fast_forward": KEY_F}
 	for action: String in bindings:
 		if InputMap.has_action(action):
 			continue
