@@ -82,6 +82,7 @@ var _repairs := 0
 var _awaiting_boarding := false
 var _debrief: MathDebrief
 var _panel_closed_frame := -10
+var _progress_bar: CompletionBar
 
 
 func _ready() -> void:
@@ -107,6 +108,10 @@ func _ready() -> void:
 	_dangers.passed.connect(func() -> void:
 		_toast("The %s has gone: repair the damaged machines" % _dangers.kind_name(), Color(0.6, 1.0, 0.6)))
 	_dangers.caught.connect(_on_caught_outside)
+	_dangers.shutdown_started.connect(func() -> void:
+		_toast("Systems shut down: the base is frozen and you move at quarter speed", Color(0.55, 0.8, 1.0)))
+	_dangers.shelter_stocked.connect(func(hours: float) -> void:
+		_toast("Stocked the shelter with %s of supplies" % _fmt_hours(hours), Color(0.6, 1.0, 0.6)))
 	Base.failure_started.connect(_on_failure_started)
 	Base.failure_repaired.connect(_on_failure_repaired)
 	Base.game_over.connect(_on_game_over)
@@ -129,6 +134,7 @@ func _process(delta: float) -> void:
 	_blink = fmod(_blink + delta, 1.0)
 	_update_visuals()
 	_find_target()
+	_progress_bar.visible = false
 	_handle_input(delta)
 	_update_speed()
 	_update_alert()
@@ -189,7 +195,15 @@ func _handle_input(delta: float) -> void:
 		_handle_drill(delta)
 		return
 	if _target_site == "control":
-		_repair_progress = 0.0
+		# During a warning, hold E here to pack a survival pack to carry down.
+		if _dangers.phase == "warning" and _dangers.pack_blocked() == "" and Input.is_action_pressed("interact"):
+			_repair_progress += delta
+			if _repair_progress >= repair_seconds:
+				_repair_progress = 0.0
+				_dangers.pack()
+				_toast("Packed %s of air, water and food: carry it down to the tunnels" % _fmt_hours(_dangers.pack_hours), Color(0.6, 0.9, 1.0))
+		else:
+			_repair_progress = 0.0
 		_show_prompt("CONTROL PANEL\n" + _dangers.status_text())
 		return
 	var site := "solar" if _target_site == "panel" else _target_site
@@ -205,10 +219,7 @@ func _handle_input(delta: float) -> void:
 				_repair_progress = 0.0
 		else:
 			_repair_progress = 0.0
-		var pct := int(100.0 * _repair_progress / repair_seconds)
 		text = "%s\nHold E to repair" % Base.FAILURE_NAMES[failure]
-		if _repair_progress > 0.0:
-			text += "  %d%%" % pct
 	elif _target_site in Base.SYSTEMS:
 		_repair_progress = 0.0
 		var on: bool = Base.switches[_target_site]
@@ -232,6 +243,11 @@ func _show_prompt(text: String) -> void:
 	_prompt.text = text
 	_prompt.visible = true
 	_prompt.global_position = _target.global_position + Vector2(-_prompt.size.x / 2.0, -95.0 - _prompt.size.y)
+	# Holding E fills a completion bar just under the prompt.
+	_progress_bar.visible = _repair_progress > 0.0
+	_progress_bar.global_position = _target.global_position + Vector2(0, -86.0)
+	_progress_bar.fraction = clampf(_repair_progress / repair_seconds, 0.0, 1.0)
+	_progress_bar.queue_redraw()
 
 
 ## Hold E at an ice vein in the tunnels to drill one load of water. Each load is
@@ -267,8 +283,6 @@ func _handle_drill(delta: float) -> void:
 	var text := "Ice vein: pass %d brings %.2f L (= %.1f × %.1f^%d)\n" % [n + 1, litres, a, r, n]
 	text += "About %.1f L left (= %.2f ÷ (1 − %.1f)), costs %.1f kWh\n" % [Base.ice_left(vein), litres, r, cost]
 	text += "⚠ " + blocked if blocked != "" else "Hold E to drill"
-	if _repair_progress > 0.0:
-		text += "  %d%%" % int(100.0 * _repair_progress / repair_seconds)
 	_show_prompt(text)
 
 
@@ -407,8 +421,9 @@ func _update_toasts(delta: float) -> void:
 	for t in _toasts:
 		lines.append(t.text)
 	_toast_label.text = "\n".join(lines)
-	# Make room for the calamity banner (DangerEvents) above the toasts.
-	_toast_label.offset_top = 212.0 if _dangers.in_danger() else 184.0
+	# Under the calamity banner (top of the screen) while it shows.
+	var banner := _dangers.banner_bottom()
+	_toast_label.offset_top = banner + 6.0 if banner > 0.0 else 184.0
 	if not _toasts.is_empty():
 		_toast_label.add_theme_color_override("font_color", _toasts[-1].color)
 	# Point at waiting pods so the player knows where to go.
@@ -536,6 +551,10 @@ func _build_ui() -> void:
 	_prompt.z_index = 20
 	_prompt.visible = false
 	add_child(_prompt)
+
+	_progress_bar = CompletionBar.new()
+	_progress_bar.visible = false
+	add_child(_progress_bar)
 
 	var layer := CanvasLayer.new()
 	layer.layer = 9
@@ -678,3 +697,22 @@ func _ensure_input_actions() -> void:
 		var event := InputEventKey.new()
 		event.physical_keycode = bindings[action]
 		InputMap.action_add_event(action, event)
+
+
+## A small bar that fills while E is held for a repair, a drill or a pack.
+class CompletionBar:
+	extends Node2D
+
+	const WIDTH := 120.0
+	const HEIGHT := 10.0
+	var fraction := 0.0
+
+	func _ready() -> void:
+		z_index = 20
+
+	func _draw() -> void:
+		var r := Rect2(-WIDTH / 2.0, 0.0, WIDTH, HEIGHT)
+		draw_rect(r.grow(2.0), Color.BLACK)
+		draw_rect(r, Color(0.15, 0.18, 0.22))
+		draw_rect(Rect2(r.position, Vector2(WIDTH * fraction, HEIGHT)),
+				Color(0.35, 0.9, 0.55).lerp(Color(1.0, 0.85, 0.3), 1.0 - fraction))

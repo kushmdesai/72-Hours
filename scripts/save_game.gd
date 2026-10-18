@@ -58,6 +58,8 @@ static func save(slot: int, main: Node) -> Error:
 		cfg.set_value("danger", "phase", d.phase)
 		cfg.set_value("danger", "kind", d.kind)
 		cfg.set_value("danger", "arrive_hour", d.arrive_hour)
+		cfg.set_value("danger", "carried", d.carried.duplicate())
+		cfg.set_value("danger", "shelter", d.shelter.duplicate())
 		var s: SupplyDrops = ctrl._drops
 		cfg.set_value("pods", "pods", s.pods.duplicate(true))
 		cfg.set_value("pods", "collected", s.collected)
@@ -109,6 +111,8 @@ static func apply_pending(main: Node) -> void:
 		d.phase = cfg.get_value("danger", "phase", d.phase)
 		d.kind = cfg.get_value("danger", "kind", d.kind)
 		d.arrive_hour = cfg.get_value("danger", "arrive_hour", d.arrive_hour)
+		d.carried = cfg.get_value("danger", "carried", d.carried)
+		d.shelter = cfg.get_value("danger", "shelter", d.shelter)
 		var s: SupplyDrops = ctrl._drops
 		s.pods.assign(cfg.get_value("pods", "pods", []))
 		s.collected = cfg.get_value("pods", "collected", 0)

@@ -17,18 +17,29 @@ signal warning_started
 signal arrived
 signal caught
 signal passed
+## The base systems just shut down for the calamity (resources freeze and the
+## astronaut slows to a crawl).
+signal shutdown_started
+## The astronaut carried supplies down into the tunnels: hours of air, water
+## and food added to the shelter.
+signal shelter_stocked(hours: float)
 
 ## When the first calamity arrives, in in-game hours (picked in this range).
 @export var first_hours := Vector2(14.0, 20.0)
 ## Hours between one calamity ending and the next arriving.
 @export var gap_hours := Vector2(16.0, 22.0)
 ## How long before arrival the Control Panel warns.
-@export var warning_hours: float = 3.0
+@export var warning_hours: float = 6.0
 ## How long each calamity lasts.
 @export var duration_hours: float = 2.0
 ## The systems shut down this long before arrival: resources freeze until the
 ## calamity passes and the astronaut moves at a quarter speed.
 @export var freeze_hours: float = 1.0
+## Warn this long before the shutdown that it is coming.
+@export var shutdown_warning_hours: float = 1.0
+## Hours of air, water and food in one survival pack packed at the Control
+## Panel. The shelter needs `duration_hours` worth to last the calamity.
+@export var pack_hours: float = 1.0
 
 const TUNNELS := "res://scenes/locations/tunnels.tscn"
 ## name: shown in the banner and on the Control Panel; art: drawn in the sky
@@ -68,6 +79,12 @@ const ORDER := ["black_hole", "alien", "asteroids"]
 const ASTEROID_SMALL := preload("res://assests/background/Pixelated Astroid (SMALL).png")
 
 var phase := "calm"
+## Supplies the astronaut is carrying and supplies stocked in the tunnel
+## shelter, by resource (oxygen kg, water L, food kg).
+var carried := {"oxygen": 0.0, "water": 0.0, "food": 0.0}
+var shelter := {"oxygen": 0.0, "water": 0.0, "food": 0.0}
+## Why the run ended if it was the calamity's fault (see caught_text()).
+var fail_text := ""
 ## Which calamity is next (or happening): a key of KINDS.
 var kind := "black_hole"
 ## Hour the next (or current) calamity arrives.
@@ -83,6 +100,7 @@ var _tint: ColorRect
 var _frost: ColorRect
 var _t := 0.0
 var _dt := 0.0
+var _last_hour := -1.0
 ## Asteroids streaking across the sky during an asteroid warning:
 ## {node: TextureRect, velocity: Vector2}.
 var _meteors: Array[Dictionary] = []
@@ -105,9 +123,21 @@ func _process(delta: float) -> void:
 		_layer.visible = false
 		return
 	var h := Base.hour
+	if _last_hour < 0.0:
+		_last_hour = h
+	var was_frozen := Base.frozen
 	# Resources hold still from the last warning hour until the calamity
 	# passes, so sheltering in the tunnels can't run a tank dry or over its max.
 	Base.frozen = frozen()
+	if Base.frozen and not was_frozen:
+		shutdown_started.emit()
+	# Whatever the astronaut carries down is unpacked into the shelter.
+	if sheltered() and _total(carried) > 0.0:
+		var hours := hours_of(carried)
+		for k: String in carried:
+			shelter[k] += carried[k]
+			carried[k] = 0.0
+		shelter_stocked.emit(hours)
 	match phase:
 		"calm":
 			# No calamity that would still be passing when the rescue ship lands.
@@ -128,6 +158,14 @@ func _process(delta: float) -> void:
 				phase = "calm"
 				caught.emit()
 				return
+			# The base is shut down, so the astronaut lives off the shelter.
+			var used := _use_shelter(h - _last_hour)
+			if used != "":
+				phase = "calm"
+				fail_text = "You ran out of %s in the shelter at hour %.1f.\nCarry enough supplies down before the %s arrives." % [
+						used, h, kind_name()]
+				caught.emit()
+				return
 			if h >= arrive_hour + duration_hours:
 				phase = "calm"
 				Base.frozen = false
@@ -135,6 +173,7 @@ func _process(delta: float) -> void:
 				passed.emit()
 				# The other calamity comes next.
 				kind = ORDER[(ORDER.find(kind) + 1) % ORDER.size()]
+	_last_hour = h
 	_update_visuals()
 
 
@@ -161,9 +200,76 @@ func kind_name() -> String:
 	return KINDS[kind].name.to_lower().replace("ufo", "UFO")
 
 
-## End-screen text for being caught outside.
+## End-screen text for being caught outside (or running out in the shelter).
 func caught_text() -> String:
+	if fail_text != "":
+		return fail_text
 	return KINDS[kind].caught % Base.hour
+
+
+## Hours a set of supplies keeps the astronaut alive: the scarcest one decides.
+func hours_of(supplies: Dictionary) -> float:
+	var c := Base.config
+	return minf(supplies.oxygen / c.oxygen_use, minf(supplies.water / c.water_use, supplies.food / c.food_use))
+
+
+## What one survival pack takes from the base stores.
+func pack_contents() -> Dictionary:
+	var c := Base.config
+	return {"oxygen": c.oxygen_use * pack_hours, "water": c.water_use * pack_hours,
+			"food": c.food_use * pack_hours}
+
+
+## Why a pack can't be made right now, or "" if it can.
+func pack_blocked() -> String:
+	if phase != "warning":
+		return "Nothing to pack for: no calamity is coming"
+	for k: String in pack_contents():
+		if Base.value(k) - pack_contents()[k] <= Base.min_of(k):
+			return "The base can't spare the %s" % k
+	return ""
+
+
+## Take one survival pack out of the base stores and carry it.
+func pack() -> void:
+	var contents := pack_contents()
+	for k: String in contents:
+		Base.set(k, Base.value(k) - contents[k])
+		carried[k] += contents[k]
+	Base._invalidate_forecast()
+
+
+## Hours of supplies stocked plus carried, against the hours needed.
+func supplies_line() -> String:
+	return "Shelter supplies: %s stocked + %s carried / %s needed" % [
+		_fmt(hours_of(shelter)), _fmt(hours_of(carried)), _fmt(duration_hours)]
+
+
+## Screen y just below the banner, so other messages can sit under it.
+func banner_bottom() -> float:
+	if not _banner.visible or not _layer.visible:
+		return 0.0
+	return _banner.offset_top + _banner.get_minimum_size().y
+
+
+func _total(d: Dictionary) -> float:
+	return d.oxygen + d.water + d.food
+
+
+## Breathe, drink and eat from the shelter for dt hours. Returns the name of
+## anything that ran out, or "".
+func _use_shelter(dt: float) -> String:
+	if dt <= 0.0:
+		return ""
+	var c := Base.config
+	var use := {"oxygen": c.oxygen_use, "water": c.water_use, "food": c.food_use}
+	var names := {"oxygen": "air", "water": "water", "food": "food"}
+	for k: String in use:
+		shelter[k] -= use[k] * dt
+		if shelter[k] < 0.0:
+			shelter[k] = 0.0
+			return names[k]
+	return ""
 
 
 func hours_until_gone() -> float:
@@ -174,7 +280,12 @@ func hours_until_gone() -> float:
 func status_text() -> String:
 	match phase:
 		"warning":
-			return "DANGER: %s in %s, shelter in the ice tunnels" % [kind_name(), _fmt(hours_until_arrival())]
+			var t := "DANGER: %s in %s\n" % [kind_name(), _fmt(hours_until_arrival())]
+			var blocked := pack_blocked()
+			if blocked != "":
+				return t + "⚠ " + blocked
+			return t + "Hold E to pack %s of supplies (%s of %s ready)" % [
+				_fmt(pack_hours), _fmt(hours_of(shelter) + hours_of(carried)), _fmt(duration_hours)]
 		"active":
 			return "DANGER: %s %s, %s left" % [kind_name(), KINDS[kind].passing, _fmt(hours_until_gone())]
 	return "All clear: next calamity (%s) in %s" % [kind_name(), _fmt(hours_until_arrival())]
@@ -212,6 +323,10 @@ func _update_visuals() -> void:
 			_banner.text = "⚠ %s in %s: get to the ice tunnels (hatch on the Landing Pad)" % [title, _fmt(hours_until_arrival())]
 			if sheltered():
 				_banner.text = "⚠ %s in %s: you are safe down here, wait it out" % [title, _fmt(hours_until_arrival())]
+			_banner.text += "\n" + supplies_line() + ("  (pack at the Control Panel)" if hours_of(shelter) + hours_of(carried) < duration_hours else "  ✓")
+			var to_shutdown := hours_until_arrival() - freeze_hours
+			if to_shutdown > 0.0 and to_shutdown <= shutdown_warning_hours:
+				_banner.text += "\n⚠ SYSTEMS SHUT DOWN in %s: the base freezes and you will move at quarter speed" % _fmt(to_shutdown)
 			_banner.modulate.a = 1.0 if flash_on else 0.7
 			# It grows in the sky as it gets closer (hidden underground).
 			var k := 1.0 - hours_until_arrival() / warning_hours
@@ -222,12 +337,12 @@ func _update_visuals() -> void:
 				_hole.pivot_offset = art.get_size() / 2.0
 			_hole.visible = not sheltered()
 			if kind == "black_hole":
-				_hole.position = Vector2(692, 35)
+				_hole.position = Vector2(980, 90)
 				_hole.scale = Vector2.ONE * lerpf(0.5, 1.6, k)
 				_hole.rotation = _t * 0.3
 			else:
 				# The UFO sweeps in from the right and bobs as it hovers.
-				_hole.position = Vector2(lerpf(1100.0, 692.0, minf(k * 2.0, 1.0)), 50.0 + sin(_t * 2.0) * 8.0)
+				_hole.position = Vector2(lerpf(1200.0, 980.0, minf(k * 2.0, 1.0)), 100.0 + sin(_t * 2.0) * 8.0)
 				_hole.scale = Vector2.ONE * lerpf(0.8, 1.5, k)
 				_hole.rotation = sin(_t * 1.3) * 0.08
 			if kind == "asteroids":
@@ -242,8 +357,8 @@ func _update_visuals() -> void:
 			_tint.visible = false
 		"active":
 			_banner.visible = true
-			_banner.text = "%s %s: stay in the tunnels, %s left" % [
-				KINDS[kind].name, KINDS[kind].passing.to_upper(), _fmt(hours_until_gone())]
+			_banner.text = "%s %s: stay in the tunnels, %s left\nShelter supplies last %s" % [
+				KINDS[kind].name, KINDS[kind].passing.to_upper(), _fmt(hours_until_gone()), _fmt(hours_of(shelter))]
 			_banner.modulate.a = 1.0
 			_hole.visible = false
 			_tint.visible = true
@@ -303,17 +418,20 @@ func _build() -> void:
 	_hole.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_hole.size = Vector2(100, 100)
 	_hole.pivot_offset = Vector2(50, 50)
-	_hole.position = Vector2(692, 35)
+	_hole.position = Vector2(980, 90)
 	_hole.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hole.visible = false
 	_layer.add_child(_hole)
 
 	_banner = Label.new()
+	# Along the top, right of the HUD's systems panel, clear of the prompts.
 	_banner.anchor_left = 0.0
 	_banner.anchor_right = 1.0
-	_banner.offset_top = 178.0
+	_banner.offset_left = 310.0
+	_banner.offset_right = -10.0
+	_banner.offset_top = 12.0
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner.add_theme_font_size_override("font_size", 20)
+	_banner.add_theme_font_size_override("font_size", 18)
 	_banner.add_theme_color_override("font_color", Color(1.0, 0.55, 0.3))
 	_banner.add_theme_color_override("font_outline_color", Color.BLACK)
 	_banner.add_theme_constant_override("outline_size", 6)
