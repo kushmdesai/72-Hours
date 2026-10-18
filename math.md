@@ -230,15 +230,16 @@ dF/dt = G − c_F,      G = y·u_gh·f(T),      f(T) = max(0, 1 − ((T − T_op
 
 The astronaut eats `c_F = 0.075 kg/h` (1.8 kg/day). The 2.5 kg starting food lasts `2.5/0.075 ≈ 33 h` without the greenhouse, so the greenhouse is required.
 
-The greenhouse grows `y = 0.18 kg/h` at its best, scaled by `f(T)`, an **inverted parabola** centred on `T_opt = 23 °C` that falls to zero `T_span = 14 °C` either side (at 9 °C and 37 °C):
+The greenhouse grows `y = 0.3 kg/h` at its best, scaled by `f(T)`, an **inverted parabola** centred on `T_opt = 23 °C` that falls to zero `T_span = 20 °C` either side (at 3 °C and 43 °C):
 
 | Cabin T | f(T) | Crop growth G | dF/dt |
 |---|---|---|---|
-| 23 °C | 1.00 | 0.180 kg/h | +0.105 kg/h |
-| 21 °C | 0.98 | 0.176 kg/h | +0.101 kg/h |
-| 16 °C | 0.75 | 0.135 kg/h | +0.060 kg/h |
-| 12 °C | 0.38 | 0.069 kg/h | −0.006 kg/h |
-| 9 °C | 0 | 0 | −0.075 kg/h |
+| 23 °C | 1.00 | 0.300 kg/h | +0.225 kg/h |
+| 21 °C | 0.99 | 0.297 kg/h | +0.222 kg/h |
+| 16 °C | 0.88 | 0.263 kg/h | +0.188 kg/h |
+| 12 °C | 0.70 | 0.209 kg/h | +0.134 kg/h |
+| 9 °C | 0.51 | 0.153 kg/h | +0.078 kg/h |
+| 5 °C | 0.19 | 0.057 kg/h | −0.018 kg/h |
 
 So temperature couples into food: a cold cabin starves you even with the greenhouse on. Plants also return a little oxygen (`p = 0.08` kg per kg grown) and drink `w_gh = 0.15 L/h` of water. Food above 6 kg spoils, so the code clamps `F` at its max rather than ending the game.
 
@@ -323,7 +324,7 @@ Equipment breaks at random. Each failure type is modelled as a **Poisson process
 | Generator jam | 0.012 | forces `u_gen = 0` |
 | Water pipe leak | 0.012 | adds `L_W = 1.5 L/h` |
 | Heater fault | 0.010 | forces `u_heat = 0` |
-| Crop blight | 0.010 | forces `u_gh = 0` |
+| Crop blight | 0.006 | forces `u_gh = 0` |
 
 **The key formula.** For a Poisson process, the waiting time until the next event is **exponentially distributed**, so the probability that a failure happens within the next `t` hours is
 
@@ -529,8 +530,8 @@ A natural next step in the modelling cycle would be to **refine** any of these, 
 | `C` | heat capacity | 0.9 kWh/°C |
 | `T_out` | outside temperature | −173 °C (night) to 10 °C (noon) |
 | `τ = C/k` | thermal time constant | 75 h |
-| `y` | crop yield | 0.18 kg/h |
-| `T_opt, T_span` | best growing temperature, growth width | 23 °C, 14 °C |
+| `y` | crop yield | 0.3 kg/h |
+| `T_opt, T_span` | best growing temperature, growth width | 23 °C, 20 °C |
 | `p` | oxygen per kg of crop | 0.08 |
 | `c_F` | food eaten | 0.075 kg/h |
 | `a, r` (ice) | first drill load, ratio | 3 L, 0.5 |
