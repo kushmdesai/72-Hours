@@ -73,6 +73,8 @@ var _survive_label: Label
 var _verdict_label: Label
 var _clock_panel: PanelContainer
 var _systems_panel: PanelContainer
+var _coin_panel: PanelContainer
+var _coin_label: Label
 var _net_label: Label
 var _sun_label: Label
 var _risk_label: Label
@@ -237,8 +239,11 @@ func _refresh_row(key: String, rescue: float) -> void:
 
 func _refresh_systems() -> void:
 	_systems_panel.visible = _base != null
+	_coin_panel.visible = _base != null and "coins" in _base
 	if not _base:
 		return
+	if _coin_panel.visible:
+		_coin_label.text = "● %d" % int(_base.coins)
 	var cfg = _base.config
 	var draws := {
 		"oxygen": cfg.power_generator,
@@ -395,10 +400,20 @@ func _build() -> void:
 
 	# Systems and power, top left in the sky (the calamities appear further
 	# right, and this keeps the tunnels' floor clear).
+	var top_left := HBoxContainer.new()
+	top_left.offset_left = 10
+	top_left.offset_top = 10
+	top_left.add_theme_constant_override("separation", 6)
+	top_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top_left)
 	_systems_panel = _panel()
-	_systems_panel.offset_left = 10
-	_systems_panel.offset_top = 10
-	add_child(_systems_panel)
+	top_left.add_child(_systems_panel)
+	# Coins, a small badge beside the systems panel.
+	_coin_panel = _panel()
+	_coin_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top_left.add_child(_coin_panel)
+	_coin_label = _label("", 16, Color(1.0, 0.85, 0.35))
+	_coin_panel.add_child(_pair(_label("COINS ", 11, COLOR_DIM), _coin_label))
 	var sbox := VBoxContainer.new()
 	sbox.add_theme_constant_override("separation", 1)
 	_systems_panel.add_child(sbox)
