@@ -339,9 +339,9 @@ calm ──(6 h before arrival)──▶ warning ──(arrival)──▶ active
 ```
 
 - The first one arrives between hour 14 and 20, and each later one 16 to 22 hours after the last one ended. No calamity is scheduled if it would still be going when the rescue ship lands.
-- During **warning**, a banner along the top of the screen counts down and the Control Panel shows its danger art. The threat grows in the sky (the black hole swells and spins, the UFO sweeps in, asteroids streak past more and more often).
+- During **warning**, a banner along the top of the screen counts down and the Control Panel shows its danger art. The threat grows in the sky (the black hole swells and spins, the UFO sweeps in, asteroids streak past more and more often and burst into puffs of dust where they hit the ground).
 - **Packing the shelter.** During the warning, holding E at the Control Panel packs a survival pack: one hour's worth of air, water and food (`pack_contents()`, `pack_hours = 1`) taken out of the base's stores, refused if that would push a store to its minimum. The astronaut carries packs (`carried`) down to the Ice Tunnels, where they are stocked in the `shelter`. The banner shows the hours stocked plus carried against the 2 hours the calamity lasts.
-- For the last hour of the warning and the whole **active** phase, `Base.frozen` is true: the base's resources stop changing and the player moves at quarter speed. A banner countdown and a toast warn an hour before this shutdown.
+- For the last hour of the warning and the whole **active** phase, `Base.frozen` is true: the base's resources stop changing, the player moves at quarter speed, and the machines ice over blue. Their consoles read FROZEN and refuse switching or repairs until the calamity passes. A banner countdown and a toast warn an hour before this shutdown.
 - On **arrival**, the calamity triggers its list of failures (for example the UFO breaks the generator, heater and pipes).
 - While it is **active**, the astronaut lives off the shelter: `_use_shelter(dt)` subtracts the normal breathing, drinking and eating rates from the stocked supplies. If any of them runs out before the calamity passes, the run ends.
 - If the player is anywhere other than the Ice Tunnels while it is active, `caught` is emitted and the run ends.
