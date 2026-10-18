@@ -453,7 +453,7 @@ Differentiating, its speed is proportional to `t_left`, so it slows at a **const
 t_shelter = min(O_s / c_O,  W_s / c_W,  F_s / c_F)
 ```
 
-hours, the same "the scarcest resource decides" minimum as the survival clock in [section 5](#5-forecasting-time-until-a-limit-and-the-survival-clock). A calamity lasts 2 hours, so the player needs at least two packs' worth of every consumable stocked before it arrives. During the calamity the shelter's stores fall linearly (constant rates, so here the straight-line formula is exact), and the run ends if one reaches zero first.
+hours, the same "the scarcest resource decides" minimum as the survival clock in [section 5](#5-forecasting-time-until-a-limit-and-the-survival-clock). A calamity lasts 2 hours, so the player needs at least two packs' worth of every consumable stocked before it arrives. During the calamity the shelter's stores fall linearly (constant rates, so here the straight-line formula is exact), and the run ends if one reaches zero first. Each frame drains `c·Δt` with Δt = min(t, t_end) − max(t_prev, t_arrive), the overlap of the frame with the calamity window, so the drains add up to exactly `c × 2 h` however the frames fall, and two packs are always enough.
 
 **Score.** A linear function: `score = 10·hours + 40·repairs + 60·pods + 1000·rescued`.
 

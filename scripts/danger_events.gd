@@ -158,8 +158,12 @@ func _process(delta: float) -> void:
 				phase = "calm"
 				caught.emit()
 				return
-			# The base is shut down, so the astronaut lives off the shelter.
-			var used := _use_shelter(h - _last_hour)
+			# The base is shut down, so the astronaut lives off the shelter, but
+			# only for the calamity itself: the drain is clamped to the window
+			# [arrival, arrival + duration], so packing exactly duration_hours
+			# of supplies always lasts (a frame can overshoot either end).
+			var end := arrive_hour + duration_hours
+			var used := _use_shelter(minf(h, end) - maxf(_last_hour, arrive_hour))
 			if used != "":
 				phase = "calm"
 				fail_text = "You ran out of %s in the shelter at hour %.1f.\nCarry enough supplies down before the %s arrives." % [
@@ -266,7 +270,8 @@ func _use_shelter(dt: float) -> String:
 	var names := {"oxygen": "air", "water": "water", "food": "food"}
 	for k: String in use:
 		shelter[k] -= use[k] * dt
-		if shelter[k] < 0.0:
+		# A hair of tolerance so rounding can't fail an exactly-packed shelter.
+		if shelter[k] < -1e-6:
 			shelter[k] = 0.0
 			return names[k]
 	return ""
@@ -323,7 +328,7 @@ func _update_visuals() -> void:
 			_banner.text = "⚠ %s in %s: get to the ice tunnels (hatch on the Landing Pad)" % [title, _fmt(hours_until_arrival())]
 			if sheltered():
 				_banner.text = "⚠ %s in %s: you are safe down here, wait it out" % [title, _fmt(hours_until_arrival())]
-			_banner.text += "\n" + supplies_line() + ("  (pack at the Control Panel)" if hours_of(shelter) + hours_of(carried) < duration_hours else "  ✓")
+			_banner.text += "\n" + supplies_line() + ("  (pack at the Control Panel)" if hours_of(shelter) + hours_of(carried) < duration_hours - 1e-4 else "  ✓")
 			var to_shutdown := hours_until_arrival() - freeze_hours
 			if to_shutdown > 0.0 and to_shutdown <= shutdown_warning_hours:
 				_banner.text += "\n⚠ SYSTEMS SHUT DOWN in %s: the base freezes and you will move at quarter speed" % _fmt(to_shutdown)
