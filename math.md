@@ -42,7 +42,7 @@ The game walks through every stage of that cycle:
 | **Assumptions** | The base is described by five numbers (oxygen, energy, water, temperature, food). Each machine is either fully on or off. Rates depend only on the current state, the time of day, and which machines and failures are active. See [section 14](#14-assumptions-and-limitations). |
 | **Model** | A system of five coupled **ordinary differential equations** (rates of change), plus a **Poisson process** for breakdowns. |
 | **Solve** | **Euler's method**, a numerical integration, every frame. The same solver runs ahead in time to **forecast** when each resource will fail. |
-| **Learn the model** | The tutorial walks a new player through the pieces: the jump formulas, a machine screen's equation and its what-if graph, flipping a `uᵢ` from 0 to 1, and reading rates and time-to-limit off the HUD. |
+| **Learn the model** | The tutorial walks a new player through every piece by doing it: the jump formulas, a machine screen's equation and its what-if graph, flipping a `uᵢ` from 0 to 1, reading rates and time-to-limit off the HUD, the falling food price `p(s) = P₀qˢ` and the area a sale pays, the coal generator's `C/b` hours, the ice vein's geometric series, and a calamity drill where supplies are budgeted in hours. |
 | **Interpret** | The HUD turns the numbers into "Water reaches its minimum in 5h 20m", and the machine screens compare what happens if a machine is on or off. |
 | **Look back** | The math debrief at the end graphs every resource over the run against its equation. |
 | **Validate and refine** | A headless simulation (`tests/balance_sim.gd`) plays the model with fixed strategies, and the constants were tuned until the results matched how the game should feel. |
