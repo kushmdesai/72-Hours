@@ -40,6 +40,7 @@ const SYSTEMS := {
 	"water": "Water recycler",
 	"heater": "Heater",
 	"greenhouse": "Greenhouse",
+	"coal": "Coal gen",
 }
 
 ## Multiplies every font size and fixed width in the HUD, for readability.
@@ -268,6 +269,10 @@ func _refresh_systems() -> void:
 		if system == "solar":
 			power = "+%.1f kW" % _base.solar_power()
 			active = _base.solar_power() > 0.0
+		elif system == "coal":
+			# Supplies power while it has coal; shows how much is in the hopper.
+			active = _base.coal_running()
+			power = "+%.1f kW" % cfg.coal_generator_power if active else "%.1f kg" % _base.coal
 		else:
 			var running: bool = {
 				"oxygen": _base.generator_running(),
@@ -281,7 +286,7 @@ func _refresh_systems() -> void:
 		row.power.add_theme_color_override("font_color", Color.WHITE if active else COLOR_OFF)
 		row.name.add_theme_color_override("font_color", Color.WHITE if on else COLOR_OFF)
 
-	var net: float = _base.solar_power() - _base.power_draw()
+	var net: float = _base.solar_power() + _base.coal_power() - _base.power_draw()
 	_net_label.text = "net %+.1f kW" % net
 	_net_label.add_theme_color_override("font_color", COLOR_GOOD if net >= 0.0 else COLOR_WARN)
 

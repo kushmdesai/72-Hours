@@ -22,10 +22,11 @@ const TITLES := {
 	"water": "WATER RECYCLER",
 	"heater": "HEATER",
 	"greenhouse": "GREENHOUSE",
+	"coal": "COAL GENERATOR",
 }
 ## The resource each system mainly controls, drawn on the graph.
 const PRIMARY := {"solar": "energy", "oxygen": "oxygen", "water": "water", "heater": "temperature",
-		"greenhouse": "food"}
+		"greenhouse": "food", "coal": "energy"}
 const NAMES := {"oxygen": "Oxygen", "energy": "Battery", "water": "Water", "temperature": "Temp",
 		"food": "Food"}
 const UNITS := {"oxygen": "kg", "energy": "kWh", "water": "L", "temperature": "°C", "food": "kg"}
@@ -91,7 +92,7 @@ func _simulate(on: bool) -> Dictionary:
 	var saved: bool = Base.switches[site]
 	Base.switches[site] = on
 	var state := {"oxygen": Base.oxygen, "energy": Base.energy,
-			"water": Base.water, "temperature": Base.temperature, "food": Base.food}
+			"water": Base.water, "temperature": Base.temperature, "food": Base.food, "coal": Base.coal}
 	var rates_now := Base.rates()
 	var limits := {}
 	var curve := PackedVector2Array()
@@ -99,7 +100,9 @@ func _simulate(on: bool) -> Dictionary:
 	var t := 0.0
 	curve.append(Vector2(0.0, state[key]))
 	while t < LIMIT_HORIZON_HOURS and (limits.size() < Base.RESOURCES.size() or t < LOOKAHEAD_HOURS):
-		var r := Base.rates_at(Base.hour + t, state.oxygen, state.energy, state.water, state.temperature)
+		var r := Base.rates_at(Base.hour + t, state.oxygen, state.energy, state.water, state.temperature,
+				state.coal)
+		state.coal = maxf(state.coal + r.coal * STEP_HOURS, 0.0)
 		for k: String in Base.RESOURCES:
 			state[k] += r[k] * STEP_HOURS
 			if k in Base.CAPPED:
@@ -191,9 +194,9 @@ func _equation_text() -> String:
 			if Base.failures.has("dust"):
 				lines.append("[color=#ff5a4d]Dust cuts η by %d%%: clean the panels on the Solar Array[/color]" % int(c.dust_loss * 100))
 			lines.append("")
-			lines.append("[b]Battery[/b]   dE/dt = P − Σ uᵢ·Pᵢ")
-			lines.append("      = %.2f − %.2f = [color=#ffc759]%s kW[/color]" % [
-				Base.solar_power(), Base.power_draw(), _signed(Base.rate("energy"))])
+			lines.append("[b]Battery[/b]   dE/dt = P + P_c·u_coal − Σ uᵢ·Pᵢ")
+			lines.append("      = %.2f + %.2f − %.2f = [color=#ffc759]%s kW[/color]" % [
+				Base.solar_power(), Base.coal_power(), Base.power_draw(), _signed(Base.rate("energy"))])
 		"oxygen":
 			var leak := c.oxygen_leak_rate if Base.failures.has("oxygen_leak") else 0.0
 			lines.append("[b]Oxygen[/b]   dO/dt = g·u_gen + p·G − c_O − L_O")
@@ -251,6 +254,23 @@ func _equation_text() -> String:
 				u, c.power_greenhouse, c.power_greenhouse * float(u)])
 			if Base.failures.has("blight"):
 				lines.append("[color=#ff5a4d]Blight has stopped the crop: hold E at the Greenhouse on the Solar Array to clear it[/color]")
+		"coal":
+			lines.append("[b]Coal in the hopper[/b]   dC/dt = −b·u_coal")
+			lines.append("      = −%.1f·%s = [color=#ffc759]%s kg/h[/color]" % [
+				c.coal_burn_rate, u, _signed(-c.coal_burn_rate * float(u), 1)])
+			lines.append("C = %.1f kg, so it burns for C / b = %.1f / %.1f = [color=#ffc759]%.1f h[/color]" % [
+				Base.coal, Base.coal, c.coal_burn_rate, Base.coal_hours()])
+			lines.append("")
+			lines.append("[b]Power out[/b]   P_c·u_coal = %.1f·%s = [color=#ffc759]%.1f kW[/color]" % [
+				c.coal_generator_power, u, Base.coal_power()])
+			lines.append("Each kg gives P_c / b = %.1f kWh, so the hopper holds %.1f kWh." % [
+				c.coal_generator_power / c.coal_burn_rate, Base.coal * c.coal_generator_power / c.coal_burn_rate])
+			lines.append("")
+			lines.append("[b]Battery[/b]   dE/dt = P_solar + P_c·u_coal − Σ uᵢ·Pᵢ")
+			lines.append("      = %.2f + %.2f − %.2f = [color=#ffc759]%s kW[/color]" % [
+				Base.solar_power(), Base.coal_power(), Base.power_draw(), _signed(Base.rate("energy"))])
+			lines.append("[color=#9aa6bb]u_coal is 0 once C reaches 0: dig more from the coal seams.[/color]")
+			lines.append("[color=#9aa6bb]Watch the battery max: a full battery overheats.[/color]")
 	lines.append("")
 	lines.append("[color=#9aa6bb]u = %s means this machine is %s.[/color]" % [
 		u, "running" if u == "1" else "not running"])
@@ -276,6 +296,9 @@ func _symbol_text() -> String:
 			["T_opt", "temperature the crop likes best (°C)"], ["T_span", "how far from T_opt the crop still grows (°C)"],
 			["c_F", "food you eat (kg/h)"], ["p", "oxygen given off per kg grown"],
 			["w_gh", "water the plants use (L/h)"], ["P_gh", "grow light power (kW)"]],
+		"coal": [["C", "coal in the hopper (kg)"], ["b", "coal burned per hour (kg/h)"],
+			["P_c", "power the generator makes while burning (kW)"], ["E", "battery charge (kWh)"],
+			["Σ uᵢ·Pᵢ", "power used by every running machine"]],
 	}
 	var lines: PackedStringArray = []
 	for row: Array in rows[site]:
@@ -291,6 +314,7 @@ func _running() -> bool:
 		"water": return Base.recycler_running()
 		"heater": return Base.heater_running()
 		"greenhouse": return Base.greenhouse_running()
+		"coal": return Base.coal_running()
 	return false
 
 

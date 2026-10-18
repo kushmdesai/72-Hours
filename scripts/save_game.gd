@@ -49,6 +49,8 @@ static func save(slot: int, main: Node) -> Error:
 	cfg.set_value("base", "switches", Base.switches.duplicate())
 	cfg.set_value("base", "failures", Base.failures.duplicate())
 	cfg.set_value("base", "ice_drills", Base.ice_drills.duplicate())
+	cfg.set_value("base", "coal", Base.coal)
+	cfg.set_value("base", "coal_mined", Base.coal_mined.duplicate())
 	cfg.set_value("base", "coins", Base.coins)
 	cfg.set_value("base", "food_sold", Base.food_sold)
 	cfg.set_value("base", "history", Base.history.duplicate(true))
@@ -100,6 +102,11 @@ static func apply_pending(main: Node) -> void:
 	Base.switches = cfg.get_value("base", "switches", Base.switches)
 	Base.failures = cfg.get_value("base", "failures", {})
 	Base.ice_drills = cfg.get_value("base", "ice_drills", {})
+	Base.coal = cfg.get_value("base", "coal", 0.0)
+	Base.coal_mined = cfg.get_value("base", "coal_mined", {})
+	# Saves from before the coal generator have no switch for it.
+	if not Base.switches.has("coal"):
+		Base.switches["coal"] = false
 	Base.coins = cfg.get_value("base", "coins", 0.0)
 	Base.food_sold = cfg.get_value("base", "food_sold", 0.0)
 	Base.history.assign(cfg.get_value("base", "history", []))

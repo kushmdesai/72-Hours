@@ -8,10 +8,11 @@ extends Node
 ##   R(t + dt) = R(t) + (dR/dt) * dt
 ##
 ##   dO/dt = g*u_gen + p*y*u_gh*f(T) - c_O - L_O
-##   dE/dt = eta*A*S(t) - (P_base + u_gen*P_gen + u_rec*P_rec + u_heat*H + u_gh*P_gh)
+##   dE/dt = eta*A*S(t) + P_c*u_coal - (P_base + u_gen*P_gen + u_rec*P_rec + u_heat*H + u_gh*P_gh)
 ##   dW/dt = -(1 - r*u_rec)*c_W - k_e*g*u_gen - w_gh*u_gh - L_W
 ##   dT/dt = [H*u_heat - k*(T - T_out(t))] / C
 ##   dF/dt = y*u_gh*f(T) - c_F,   f(T) = max(0, 1 - ((T - T_opt)/T_span)^2)
+##   dC/dt = -b*u_coal   (coal C in the generator's hopper, mined in the tunnels)
 ##
 ## The equations are coupled: the oxygen generator draws water and energy, the
 ## heater draws energy, and the greenhouse draws water and energy and gives
@@ -45,7 +46,7 @@ const RESOURCES := ["oxygen", "energy", "water", "temperature", "food"]
 ## is lost (food spoils), and the game goes on.
 const CAPPED := ["food"]
 ## Switchable systems, matching the `system` meta on the base's consoles.
-const SYSTEMS := ["solar", "oxygen", "water", "heater", "greenhouse"]
+const SYSTEMS := ["solar", "oxygen", "water", "heater", "greenhouse", "coal"]
 ## Where each failure is repaired: a system console, or the solar panels.
 const FAILURE_SITES := {
 	"dust": "solar",
@@ -72,10 +73,12 @@ var energy := 0.0
 var water := 0.0
 var temperature := 0.0
 var food := 0.0
+## C: kg of coal in the coal generator's hopper.
+var coal := 0.0
 ## u_i: which systems the player has switched on.
 ## The strike happens in the morning, so the heater starts off.
 var switches := {"solar": true, "oxygen": true, "water": true, "heater": false,
-		"greenhouse": true}
+		"greenhouse": true, "coal": false}
 ## Active failures, by id (keys of FAILURE_SITES).
 var failures := {}
 ## When false the clock is frozen (title screen, end screen, tests).
@@ -89,6 +92,8 @@ var ended := false
 var frozen := false
 ## How many times each ice vein in the tunnels has been drilled, by vein name.
 var ice_drills := {}
+## Kilograms already dug out of each coal seam in the tunnels, by seam name.
+var coal_mined := {}
 ## Coins earned by selling food, spent on supply pods.
 var coins := 0.0
 ## Kilograms of food sold so far this run; sets the market price.
@@ -130,9 +135,11 @@ func reset() -> void:
 	temperature = config.temperature_start
 	food = config.food_start
 	switches = {"solar": true, "oxygen": true, "water": true, "heater": false,
-			"greenhouse": true}
+			"greenhouse": true, "coal": false}
 	failures.clear()
 	ice_drills.clear()
+	coal = 0.0
+	coal_mined.clear()
 	coins = 0.0
 	food_sold = 0.0
 	history.clear()
@@ -166,6 +173,7 @@ func step(dt: float) -> void:
 		water += rates.water * dt
 		temperature += rates.temperature * dt
 		food = minf(food + rates.food * dt, config.food_max)
+		coal = maxf(coal + rates.coal * dt, 0.0)
 
 	var previous_hour := int(hour)
 	hour += dt
@@ -215,6 +223,21 @@ func crop_growth(temp: float = temperature) -> float:
 	return config.crop_yield * growth_factor(temp)
 
 
+## u_coal: 1 if the coal generator is on and has coal (C) left to burn.
+func coal_running(c: float = coal) -> bool:
+	return switches.coal and c > 0.0
+
+
+## P_c*u_coal: power from the coal generator in kW.
+func coal_power(c: float = coal) -> float:
+	return config.coal_generator_power if coal_running(c) else 0.0
+
+
+## C / b: hours the coal in the hopper lasts with the generator on.
+func coal_hours() -> float:
+	return coal / config.coal_burn_rate
+
+
 ## S(t): sunlight on the panels in kW/m^2, a half sine wave by day, 0 at night.
 func sunlight(t: float = hour) -> float:
 	var angle := TAU * (t + config.day_phase) / config.day_length
@@ -258,11 +281,12 @@ func power_draw() -> float:
 
 ## Every dR/dt at the current state, per in-game hour.
 func rates() -> Dictionary:
-	return rates_at(hour, oxygen, energy, water, temperature)
+	return rates_at(hour, oxygen, energy, water, temperature, coal)
 
 
 ## Every dR/dt at any time and state, with the current switches and failures.
-func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictionary:
+## `coal_kg` is the coal in the hopper, which decides whether the coal generator runs.
+func rates_at(t: float, _o: float, e: float, _w: float, temp: float, coal_kg: float = coal) -> Dictionary:
 	var c := config
 	var u_gen := 1.0 if generator_running() else 0.0
 	var u_rec := 1.0 if recycler_running() else 0.0
@@ -272,7 +296,8 @@ func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictiona
 	var u_gh := 1.0 if greenhouse_running() else 0.0
 	var crop := crop_growth(temp)
 
-	var d_energy := solar_power(t) - power_draw()
+	var u_coal := 1.0 if coal_running(coal_kg) else 0.0
+	var d_energy := solar_power(t) + coal_power(coal_kg) - power_draw()
 
 	return {
 		"oxygen": c.generator_output * u_gen + c.crop_oxygen * crop - c.oxygen_use - leak_o,
@@ -283,6 +308,7 @@ func rates_at(t: float, _o: float, e: float, _w: float, temp: float) -> Dictiona
 		"temperature": (c.power_heater * u_heat
 				- c.heat_loss * (temp - outside_temperature(t))) / c.heat_capacity,
 		"food": crop - c.food_use,
+		"coal": -c.coal_burn_rate * u_coal,
 	}
 
 
@@ -322,7 +348,7 @@ func time_until_empty(resource: String) -> float:
 ## that doesn't happen within FORECAST_HORIZON_HOURS.
 func forecast() -> Dictionary:
 	var state := {"oxygen": oxygen, "energy": energy, "water": water,
-			"temperature": temperature, "food": food}
+			"temperature": temperature, "food": food, "coal": coal}
 	var result := {}
 	_forecast_hits_max.clear()
 	for key in RESOURCES:
@@ -332,7 +358,10 @@ func forecast() -> Dictionary:
 	var dt := FORECAST_STEP_HOURS
 	var elapsed := 0.0
 	while elapsed < FORECAST_HORIZON_HOURS and result.size() < RESOURCES.size():
-		var r := rates_at(hour + elapsed, state.oxygen, state.energy, state.water, state.temperature)
+		var r := rates_at(hour + elapsed, state.oxygen, state.energy, state.water, state.temperature,
+				state.coal)
+		# The coal runs out partway through the forecast and the generator stops.
+		state.coal = maxf(state.coal + r.coal * dt, 0.0)
 		for key in RESOURCES:
 			if result.has(key):
 				continue
@@ -501,6 +530,26 @@ func buy_pod(kind: String) -> bool:
 	coins = maxf(coins - price, 0.0)
 	coins_changed.emit(coins)
 	return true
+
+
+## Dig one load of coal from a seam into the generator's hopper. A seam holds
+## coal_per_seam kg and each pass digs coal_per_pass kg, until the seam or the
+## hopper (coal_max) is full. Returns the kilograms gained.
+func mine_coal(seam: String) -> float:
+	var kg := minf(coal_left(seam), config.coal_per_pass)
+	kg = minf(kg, config.coal_max - coal)
+	if kg <= 0.0:
+		return 0.0
+	coal_mined[seam] = coal_mined.get(seam, 0.0) + kg
+	coal += kg
+	_invalidate_forecast()
+	supplies_added.emit("coal", kg)
+	return kg
+
+
+## Kilograms still in a coal seam.
+func coal_left(seam: String) -> float:
+	return maxf(config.coal_per_seam - coal_mined.get(seam, 0.0), 0.0)
 
 
 ## Start a failure now (used by the Poisson roll, and handy for testing).

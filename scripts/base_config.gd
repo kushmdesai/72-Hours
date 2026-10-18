@@ -128,6 +128,19 @@ extends Resource
 	"toolkit": 45,
 }
 
+@export_group("Coal  dC/dt = -b*u_coal,  power P_c*u_coal")
+## P_c: power the coal generator adds to the battery while it burns, in kW.
+@export var coal_generator_power: float = 3.0
+## b: kg of coal it burns per hour. Coal holds about 8 kWh of heat per kg and
+## a small generator turns about 37% of that into power, so 1 kg/h gives 3 kW.
+@export var coal_burn_rate: float = 1.0
+## Most coal the generator's hopper holds, in kg.
+@export var coal_max: float = 12.0
+## kg of coal in each seam in the tunnels.
+@export var coal_per_seam: float = 8.0
+## kg dug with each pass of the pick.
+@export var coal_per_pass: float = 2.0
+
 @export_group("Day and night  S(t) = S_peak * max(0, sin(2*pi*(t + phase)/period))")
 ## Length of one day/night cycle in in-game hours. A real lunar day lasts
 ## 29.5 Earth days; it is compressed so the 72 h game sees three nights.

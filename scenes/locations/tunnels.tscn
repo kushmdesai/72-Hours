@@ -214,13 +214,93 @@ polygon = PackedVector2Array(-40, 0, -30, -26, -6, -40, 18, -34, 38, -14, 42, 0)
 color = Color(0.7, 0.95, 1, 1)
 polygon = PackedVector2Array(-26, 0, -20, -30, -12, -6, -4, -44, 6, -8, 14, -34, 22, -4, 30, -20, 32, 0)
 
+[node name="CoalGenerator" type="Node2D" parent="." unique_id=1428806731 groups=["system_consoles"]]
+position = Vector2(330, 0)
+metadata/system = "coal"
+
+[node name="Chimney" type="ColorRect" parent="CoalGenerator"]
+offset_left = 12.0
+offset_top = -112.0
+offset_right = 26.0
+offset_bottom = -70.0
+mouse_filter = 2
+color = Color(0.3, 0.3, 0.33, 1)
+
+[node name="Body" type="ColorRect" parent="CoalGenerator"]
+offset_left = -36.0
+offset_top = -72.0
+offset_right = 36.0
+mouse_filter = 2
+color = Color(0.36, 0.33, 0.3, 1)
+
+[node name="Trim" type="ColorRect" parent="CoalGenerator"]
+offset_left = -38.0
+offset_top = -76.0
+offset_right = 38.0
+offset_bottom = -70.0
+mouse_filter = 2
+color = Color(0.85, 0.7, 0.2, 1)
+
+[node name="Screen" type="ColorRect" parent="CoalGenerator"]
+offset_left = -22.0
+offset_top = -44.0
+offset_right = 10.0
+offset_bottom = -18.0
+mouse_filter = 2
+color = Color(0.25, 0.28, 0.32, 1)
+
+[node name="Name" type="Label" parent="CoalGenerator"]
+offset_left = -120.0
+offset_top = -190.0
+offset_right = 120.0
+offset_bottom = -170.0
+theme_override_font_sizes/font_size = 14
+text = "COAL GENERATOR"
+horizontal_alignment = 1
+
+[node name="CoalSeams" type="Node2D" parent="." unique_id=1735529016]
+
+[node name="SeamNear" type="Node2D" parent="CoalSeams" unique_id=2010374461 groups=["coal_seams"]]
+position = Vector2(560, 0)
+
+[node name="Rock" type="Polygon2D" parent="CoalSeams/SeamNear"]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-38, 0, -34, -22, -18, -36, 4, -40, 26, -30, 38, -12, 40, 0)
+
+[node name="Glints" type="Polygon2D" parent="CoalSeams/SeamNear"]
+color = Color(0.42, 0.42, 0.5, 1)
+polygon = PackedVector2Array(-20, -20, -16, -24, -12, -20, -16, -16, 8, -28, 12, -32, 16, -28, 12, -24)
+
+[node name="SeamLow" type="Node2D" parent="CoalSeams" unique_id=395827046 groups=["coal_seams"]]
+position = Vector2(1700, 0)
+
+[node name="Rock" type="Polygon2D" parent="CoalSeams/SeamLow"]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-38, 0, -34, -22, -18, -36, 4, -40, 26, -30, 38, -12, 40, 0)
+
+[node name="Glints" type="Polygon2D" parent="CoalSeams/SeamLow"]
+color = Color(0.42, 0.42, 0.5, 1)
+polygon = PackedVector2Array(-20, -20, -16, -24, -12, -20, -16, -16, 8, -28, 12, -32, 16, -28, 12, -24)
+
+[node name="SeamEnd" type="Node2D" parent="CoalSeams" unique_id=1127654320 groups=["coal_seams"]]
+position = Vector2(2190, 0)
+
+[node name="Rock" type="Polygon2D" parent="CoalSeams/SeamEnd"]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-38, 0, -34, -22, -18, -36, 4, -40, 26, -30, 38, -12, 40, 0)
+
+[node name="Glints" type="Polygon2D" parent="CoalSeams/SeamEnd"]
+color = Color(0.42, 0.42, 0.5, 1)
+polygon = PackedVector2Array(-20, -20, -16, -24, -12, -20, -16, -16, 8, -28, 12, -32, 16, -28, 12, -24)
+
 [node name="Info" type="Label" parent="." unique_id=1195021637]
-offset_left = 240.0
-offset_top = -176.0
-offset_right = 620.0
-offset_bottom = -104.0
+offset_left = 690.0
+offset_top = -218.0
+offset_right = 1070.0
+offset_bottom = -150.0
 theme_override_font_sizes/font_size = 13
 text = "Water ice, frozen here for billions of years.
 Each pass of the drill brings up half as much as the last,
-so a vein holds  a + ar + ar² + … = a / (1 − r)  litres."
+so a vein holds  a + ar + ar² + … = a / (1 − r)  litres.
+Dig the dark coal seams to feed the coal generator."
 horizontal_alignment = 1

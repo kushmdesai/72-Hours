@@ -48,6 +48,7 @@ const SYSTEM_LABELS := {
 	"water": "water recycler",
 	"heater": "heater",
 	"greenhouse": "greenhouse",
+	"coal": "coal generator",
 }
 const COLOR_ON := Color(0.3, 0.9, 0.5)
 const COLOR_OFF := Color(0.25, 0.28, 0.32)
@@ -56,6 +57,8 @@ const DUST_TINT := Color(0.75, 0.6, 0.45)
 const MACHINE_OFF_TINT := Color(0.45, 0.45, 0.5)
 const MACHINE_BROKEN_TINT := Color(1.0, 0.45, 0.4)
 const DRILLED_TINT := Color(0.35, 0.35, 0.4)
+## Glow of the coal generator's firebox while it burns.
+const COAL_GLOW := Color(1.0, 0.55, 0.15)
 
 var _player: Node2D
 var _target: Node2D
@@ -82,6 +85,8 @@ var _repairs := 0
 var _awaiting_boarding := false
 var _debrief: MathDebrief
 var _panel_closed_frame := -10
+## Whether the coal generator was burning last frame, to notice it running out.
+var _coal_burning := false
 var _progress_bar: CompletionBar
 
 
@@ -176,6 +181,12 @@ func _find_target() -> void:
 			best = d
 			_target = vein
 			_target_site = "ice"
+	for seam: Node2D in get_tree().get_nodes_in_group("coal_seams"):
+		var d := absf(seam.global_position.x - _player.global_position.x)
+		if d < best:
+			best = d
+			_target = seam
+			_target_site = "seam"
 
 
 func _handle_input(delta: float) -> void:
@@ -193,6 +204,9 @@ func _handle_input(delta: float) -> void:
 		return
 	if _target_site == "ice":
 		_handle_drill(delta)
+		return
+	if _target_site == "seam":
+		_handle_mine(delta)
 		return
 	if _target_site == "control":
 		# During a warning, hold E here to pack a survival pack to carry down.
@@ -232,6 +246,11 @@ func _handle_input(delta: float) -> void:
 			text += "\nSolar %.1f kW, draw %.1f kW" % [Base.solar_power(), Base.power_draw()]
 			if Base.failures.has("dust"):
 				text += "\nPanels dusty: clean them on the Solar Array"
+		elif _target_site == "coal":
+			text += "\nHopper %.1f / %.0f kg of coal, burns %s" % [Base.coal, Base.config.coal_max,
+					_fmt_hours(Base.coal_hours())]
+			if Base.coal <= 0.0:
+				text += "\nEmpty: dig coal from the dark seams in these tunnels"
 	else:
 		_prompt.visible = false
 		return
@@ -286,6 +305,38 @@ func _handle_drill(delta: float) -> void:
 	_show_prompt(text)
 
 
+## Hold E at a coal seam in the tunnels to dig a load of coal straight into the
+## coal generator's hopper.
+func _handle_mine(delta: float) -> void:
+	var seam := String(_target.name)
+	var left := Base.coal_left(seam)
+	if left <= 0.0:
+		_repair_progress = 0.0
+		_show_prompt("Coal seam\nDug out")
+		return
+	var kg := minf(left, Base.config.coal_per_pass)
+	var room := Base.config.coal_max - Base.coal
+	var blocked := ""
+	if room <= 0.01:
+		blocked = "The generator's hopper is full: burn some first"
+	if Input.is_action_pressed("interact") and blocked == "":
+		_repair_progress += delta
+		if _repair_progress >= repair_seconds:
+			_repair_progress = 0.0
+			var got := Base.mine_coal(seam)
+			_toast("Dug coal: +%.1f kg, hopper %.1f kg (%s of power)" % [got, Base.coal,
+					_fmt_hours(Base.coal_hours())], Color(1.0, 0.75, 0.45))
+			return
+	else:
+		_repair_progress = 0.0
+	var c := Base.config
+	var text := "Coal seam: %.0f kg left\n" % left
+	text += "Each kg burns for %s at %.0f kW = %.1f kWh\n" % [
+			_fmt_hours(1.0 / c.coal_burn_rate), c.coal_generator_power, c.coal_generator_power / c.coal_burn_rate]
+	text += "⚠ " + blocked if blocked != "" else "Hold E to dig %.0f kg" % minf(kg, room)
+	_show_prompt(text)
+
+
 ## Open the machine screen (scripts/system_panel.gd), which pauses the game.
 func _open_panel(site: String) -> void:
 	_prompt.visible = false
@@ -309,10 +360,19 @@ func _update_visuals() -> void:
 			continue
 		if Base.failures_at(site).size() > 0:
 			screen.color = COLOR_BROKEN if flash else COLOR_OFF
+		elif site == "coal":
+			screen.color = COAL_GLOW if Base.coal_running() else COLOR_OFF
 		elif site in Base.SYSTEMS:
 			screen.color = COLOR_ON if Base.switches[site] else COLOR_OFF
 		else:
 			screen.color = COLOR_ON if Base.is_day() else COLOR_OFF
+	if _coal_burning and not Base.coal_running() and Base.switches.coal:
+		_toast("The coal generator ran out of coal: dig more in the tunnels", Color(1.0, 0.7, 0.4))
+	_coal_burning = Base.coal_running()
+	# Coal seams fade as they are dug out.
+	for seam: Node2D in get_tree().get_nodes_in_group("coal_seams"):
+		var full := Base.coal_left(seam.name) / Base.config.coal_per_seam
+		seam.modulate = DRILLED_TINT.lerp(Color.WHITE, full)
 	# Ice veins fade as they are drilled out.
 	for vein: Node2D in get_tree().get_nodes_in_group("ice_veins"):
 		var full := Base.ice_load(vein.name) / Base.config.ice_first_load
