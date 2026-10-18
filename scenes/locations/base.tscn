@@ -222,8 +222,8 @@ exit_side = "right"
 
 [node name="WestAirlockSolar" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(400, -97)
-scale = Vector2(2, 2)
+position = Vector2(400, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
@@ -232,8 +232,8 @@ open_distance = 70.0
 
 [node name="SolarOxygen" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(784, -97)
-scale = Vector2(2, 2)
+position = Vector2(784, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
@@ -242,8 +242,8 @@ open_distance = 70.0
 
 [node name="OxygenWater" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(1168, -97)
-scale = Vector2(2, 2)
+position = Vector2(1168, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
@@ -252,8 +252,8 @@ open_distance = 70.0
 
 [node name="WaterHeater" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(1552, -97)
-scale = Vector2(2, 2)
+position = Vector2(1552, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
@@ -262,8 +262,8 @@ open_distance = 70.0
 
 [node name="HeaterHabitat" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(1936, -97)
-scale = Vector2(2, 2)
+position = Vector2(1936, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
@@ -272,8 +272,8 @@ open_distance = 70.0
 
 [node name="HabitatEastAirlock" type="Sprite2D" parent="RoomDoors"]
 texture_filter = 1
-position = Vector2(2320, -97)
-scale = Vector2(2, 2)
+position = Vector2(2320, -48)
+scale = Vector2(1, 1)
 texture = ExtResource("hdoor_closed")
 script = ExtResource("door_script")
 closed_texture = ExtResource("hdoor_closed")
