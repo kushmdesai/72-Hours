@@ -30,8 +30,9 @@ Step-by-step build order. Each step ends with something playable, so the game st
 - Each switch changes its `uᵢ` term in the equations, so the HUD reacts instantly.
 - Add the coupling: the oxygen generator uses water and energy, the heater uses energy.
 
-## 6. Day/night cycle (model done, visuals to do)
-- `S(t)` is a half sine over a 24 h cycle and `T_out` follows it down to −173 °C at night; the background tint is still to do.
+## 6. Day/night cycle (done)
+- `S(t)` is a half sine over a 24 h cycle and `T_out` follows it down to −173 °C at night.
+- The ground and base are tinted by `S(t) / S_peak` (full colour at noon, dim blue at night) and the sun sprite rides the same angle across the sky, rising when `S(t)` turns positive and setting when it hits 0 (`scripts/day_night.gd`).
 - Sunlight `S(t)` follows the lunar day/night, and outside temperature drops to about −173 °C at night.
 - Tint the background and dim the solar input to make it visible.
 

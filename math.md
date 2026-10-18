@@ -139,6 +139,14 @@ S(t) = S_peak · max(0, sin(2π(t + φ)/P))      P = 24 h,  φ = 3 h
 
 The `sin` makes the sun rise, peak at noon and set smoothly; the `max(0, …)` cuts off the negative half, which is night. With `φ = 3`, the strike happens 3 hours after sunrise, the first sunset is at hour 9, and there are three nights (hours 9–21, 33–45, 57–69) before rescue. (A real lunar day lasts 29.5 Earth days; it is compressed so the game sees several cycles.)
 
+**Seeing `S(t)`.** The same function drives what the player sees (`scripts/day_night.gd`). Each frame the world is tinted by
+
+```
+tint = lerp(night_tint, white, S(t)/S_peak)
+```
+
+so the brightness of the ground is the normalised sunlight itself: dim blue at night, full colour at noon, and every shade of the half sine in between. The sun crosses the sky on the same angle `θ = 2π(t + φ)/P` used inside the sine. Its horizontal position is proportional to `θ/π`, so it moves left to right at a constant rate from sunrise (`θ = 0`) to sunset (`θ = π`), and its height above the horizon is proportional to `sin θ`, the same quantity that sets the light. So the sun's height **is** a graph of the solar power, drawn in the sky: `x ∝ θ` and `y ∝ sin θ` trace one arch of a sine curve. For `θ > π`, `sin θ < 0`, which is exactly the part the `max(0, …)` cuts off, and the sun is hidden. The sky itself is never tinted, because with no atmosphere to scatter light the Moon's sky is black even at noon.
+
 Integrating the half sine gives the energy collected over one full day:
 
 ```
@@ -462,6 +470,7 @@ hours, the same "the scarcest resource decides" minimum as the survival clock in
 - A **tone** is a periodic wave (sine, square, triangle or sawtooth) whose frequency slides linearly between two pitches, `f(t) = f₀ + (f₁ − f₀)·t/T`, a *chirp*. The code accumulates the phase (`phase += f/RATE`) rather than computing `sin(2π·f(t)·t)` directly, because the phase is the integral of the frequency and this keeps the sweep smooth.
 - Its loudness follows an **envelope**: a linear rise over the attack time, then exponential decay `e^(−t/τ)`, the same shape as the cabin cooling in [section 3.4](#34-temperature-newtons-law-of-cooling).
 - Thumps and rumbles are random noise passed through a one-pole **low-pass filter**, `yₙ = s·yₙ₋₁ + (1 − s)·xₙ`, an exponential moving average: the closer `s` is to 1, the darker the sound.
+- The **volume** setting is converted to decibels, `dB = 20·log₁₀(v)`, because loudness is perceived logarithmically: halving the slider is about −6 dB, and a tenth is −20 dB.
 - The background machine hum mixes 60 Hz and 90 Hz sine waves. Both fit a whole number of cycles in exactly one second, so the one-second sample loops forever without a click.
 
 ## 12. The math debrief: looking back at the run
