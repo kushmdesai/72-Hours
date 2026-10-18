@@ -9,6 +9,11 @@
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (SIDE).png" id="7_side"]
 [ext_resource type="Texture2D" path="res://assests/character/Pixelated astronaut (WALK).png" id="8_walk"]
 [ext_resource type="Texture2D" path="res://assests/Screenshot 2026-10-17 162125.png" id="9_stars"]
+[ext_resource type="Script" path="res://scripts/day_night.gd" id="10_daynight"]
+[ext_resource type="Texture2D" path="res://New Piskel-1.png.png" id="11_sun"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_stars"]
+blend_mode = 1
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(28, 56)
@@ -38,10 +43,15 @@ repeat_size = Vector2(465, 446)
 repeat_times = 4
 
 [node name="Sprite2D" type="Sprite2D" parent="Stars"]
+material = SubResource("CanvasItemMaterial_stars")
 texture_filter = 1
 texture = ExtResource("9_stars")
 centered = false
 offset = Vector2(-232, -400)
+
+[node name="DayNight" type="Node2D" parent="."]
+script = ExtResource("10_daynight")
+sun_texture = ExtResource("11_sun")
 
 [node name="Player" type="CharacterBody2D" parent="." unique_id=834655921]
 position = Vector2(0, -32)
