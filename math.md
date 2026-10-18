@@ -13,7 +13,7 @@ All constants quoted here are the defaults in `scripts/base_config.gd` (loaded t
 5. [Forecasting: time until a limit, and the survival clock](#5-forecasting-time-until-a-limit-and-the-survival-clock)
 6. [What-if analysis on the machine screens](#6-what-if-analysis-on-the-machine-screens)
 7. [Random failures: the Poisson process](#7-random-failures-the-poisson-process)
-8. [Ice mining: a geometric series](#8-ice-mining-a-geometric-series)
+8. [Ice mining: a geometric series](#8-ice-mining-a-geometric-series) (and coal mining)
 9. [The food market: exponential decay and an integral](#9-the-food-market-exponential-decay-and-an-integral)
 10. [Lunar gravity and the jump](#10-lunar-gravity-and-the-jump)
 11. [Other bits of math in the game](#11-other-bits-of-math-in-the-game)
@@ -68,15 +68,16 @@ Each resource changes according to a rate equation `dR/dt`. Together they form t
 
 ```
 dO/dt = g·u_gen + p·G − c_O − L_O
-dE/dt = η·A·S(t)·u_sol − (P_base + u_gen·P_gen + u_rec·P_rec + u_heat·H + u_gh·P_gh)
+dE/dt = η·A·S(t)·u_sol + P_c·u_coal − (P_base + u_gen·P_gen + u_rec·P_rec + u_heat·H + u_gh·P_gh)
 dW/dt = −(1 − r·u_rec)·c_W − k_e·g·u_gen − w_gh·u_gh − L_W
 dT/dt = [H·u_heat − k·(T − T_out(t))] / C
 dF/dt = G − c_F
+dC/dt = −b·u_coal                                  (coal in the generator's hopper)
 
 where  G = y·u_gh·f(T)   and   f(T) = max(0, 1 − ((T − T_opt)/T_span)²)
 ```
 
-The `u` terms are **control variables**, each either 0 or 1. A `u` is 1 only when the player has switched that machine on **and** it is not broken. These are the only things the player directly controls, and they are what make the game a **control problem**: choose the `u`'s over time to keep `x(t)` inside its safe box until `t = 72`.
+The `u` terms are **control variables**, each either 0 or 1. A `u` is 1 only when the player has switched that machine on **and** it is not broken (and, for the coal generator, has coal left). These are the only things the player directly controls, and they are what make the game a **control problem**: choose the `u`'s over time to keep `x(t)` inside its safe box until `t = 72`.
 
 ### Why "coupled"?
 
@@ -86,6 +87,7 @@ The equations are linked through shared terms:
 - The heater (`u_heat`) keeps you warm **but** draws 2.5 kW, the largest load in the base.
 - The greenhouse (`u_gh`) makes food and a little oxygen **but** drinks water and draws power, and how much it grows depends on the **temperature**.
 - The recycler (`u_rec`) saves water **but** draws power.
+- The coal generator (`u_coal`) adds power **but** only while there is coal, which has to be dug out by hand in the tunnels.
 
 So fixing one resource usually pushes on another. Turning the heater on at night saves the temperature but can run the battery flat; turning the generator off saves water and power but lets oxygen fall. This web of trade-offs is the strategy of the game, and it is exactly what a coupled system means mathematically: you cannot solve one equation without knowing the others.
 
@@ -145,6 +147,20 @@ Integrating the half sine gives the energy collected over one full day:
 so the panels collect about `10.8 × 24/π ≈ 82 kWh` per day, an average of about 3.4 kW.
 
 **Loads.** Life support, lights and computers always draw `P_base = 0.4 kW`. On top of that: generator 1.2 kW, recycler 0.4 kW, heater 2.5 kW, greenhouse 0.3 kW. With everything on the base draws 4.8 kW, or about 115 kWh per day, which is far more than the panels collect. Running everything all the time is not sustainable over a day, even before the heater overheats the cabin (which, as the balance test shows, happens first if you heat by day).
+
+**Coal: a second power source.** The coal generator in the Ice Tunnels adds `P_c = 3 kW` while it burns `b = 1 kg/h`, giving the extra terms
+
+```
+dE/dt = … + P_c·u_coal          dC/dt = −b·u_coal
+```
+
+Unlike the other switches, `u_coal` depends on the **state**: it is 1 only while the player has it on **and** `C > 0`. So with a full 12 kg hopper,
+
+```
+C(t) = 12 − t        for 0 ≤ t ≤ 12 h, then C = 0 and u_coal = 0
+```
+
+The coal term is a **piecewise** function of time: a constant 3 kW for exactly `C/b = 12 h`, then nothing. Each kilogram is worth `P_c/b = 3 kWh` of electricity. The constants are grounded in physics: coal holds about 8 kWh of heat per kg, and a small generator converts roughly 37% of that, `8 × 0.37 ≈ 3 kWh`. A full hopper (36 kWh) runs for 12 hours, the length of one night, and nearly covers the night-time draw with the heater on (`0.4 + 0.4 + 2.5 = 3.3 kW`). The three seams hold `3 × 8 = 24 kg`, enough for two full hoppers, so coal can carry the base through two of the three nights, if the player puts in the digging trips. The catch is the same two-sided battery limit: burning coal by day on top of the sun overcharges the battery faster.
 
 **Too much is also bad.** At noon with the heater off, `dE/dt ≈ 10.8 − 2.3 = +8.5 kW`. Starting at 30 kWh, the 100 kWh battery limit is reached in a few hours, so the player has to disconnect the panels or turn on loads. The energy equation is a two-sided constraint.
 
@@ -273,7 +289,7 @@ t_survive = min(t_O, t_E, t_W, t_T, t_F)
 
 The resource that gives the minimum is the **limiting resource**, the one to deal with first.
 
-**But the rates are not constant.** Sunlight rises and falls, and Newton's cooling slows as the temperature approaches `T_out`. A straight-line estimate made at noon would wildly overestimate how long the battery lasts into the night. So `Base.forecast()` does something better: it **runs the same Euler model forward** from the current state, in steps of 0.2 h for up to 240 h, assuming the switches stay as they are and nothing new breaks, and records when each resource first crosses a limit. With constant rates this gives exactly the formula above; with changing rates it gives the right answer.
+**But the rates are not constant.** Sunlight rises and falls, and Newton's cooling slows as the temperature approaches `T_out`. A straight-line estimate made at noon would wildly overestimate how long the battery lasts into the night. So `Base.forecast()` does something better: it **runs the same Euler model forward** from the current state, in steps of 0.2 h for up to 240 h, assuming the switches stay as they are and nothing new breaks, and records when each resource first crosses a limit. The coal in the hopper is burned down inside the forecast too, so if the generator will run dry at 2 a.m., the battery forecast already includes the power stopping then. With constant rates this gives exactly the formula above; with changing rates it gives the right answer.
 
 To make the countdown smooth, when a resource crosses its limit inside a step the code **linearly interpolates** within that step:
 
@@ -347,6 +363,8 @@ After `n` passes the water still in the vein is the tail of the series, `a·rⁿ
 In practice a vein is called empty once the next load would be under `0.2 L`, so you get four passes per vein, `3 + 1.5 + 0.75 + 0.375 = 5.625 L`, or about 16.9 L from all three veins. Melting costs `0.5 kWh` per litre (warming ice from about −200 °C and melting it takes about 0.21 kWh/L, and the drill roughly doubles that), so every litre of water is traded against the battery, another coupling. The game refuses to drill a load that would overflow the tank or flatten the battery.
 
 The geometric series models **diminishing returns**: the first effort pays off most, and each repeat pays half as much. It teaches why a series with `|r| < 1` converges to a finite total even though you could, in principle, keep drilling forever.
+
+**Coal seams, for contrast,** are **linear**: each pass of the pick digs a constant 2 kg until the seam's 8 kg is gone (4 passes), an arithmetic rather than geometric sequence. Comparing the two in the same tunnel shows the difference between a resource that runs out in equal steps and one that tapers off.
 
 ## 9. The food market: exponential decay and an integral
 
@@ -468,7 +486,7 @@ A model is only useful if it behaves sensibly, so the project checks it with `te
 | careful + failures | as above with random breakdowns (2 to 8 per run), each repaired after 1 h, seeds 1 to 5 | wins all 5 |
 | careful + slow repair | repairs only after 6 h, seeds 1 to 5 | wins 3, loses 2 (battery runs flat at hours 38.7 and 65.4) |
 
-For each run it prints the outcome and the lowest and highest value each resource reached. This is the **validation** step of the modelling cycle: the constants in `BaseConfig` (panel area, heater power, leak rates, failure rates and so on) were tuned until careless strategies lose, careful ones win, and slow responses to failures are punished. The "careful" strategy is itself a small **feedback controller** built from hysteresis bands (switch on below one threshold, off above another), which is the same idea a real thermostat uses.
+The scripted strategies never mine ice or coal, collect pods or trade, so they show what the core equations allow on their own; the extra sources give a human player more slack than this. For each run it prints the outcome and the lowest and highest value each resource reached. This is the **validation** step of the modelling cycle: the constants in `BaseConfig` (panel area, heater power, leak rates, failure rates and so on) were tuned until careless strategies lose, careful ones win, and slow responses to failures are punished. The "careful" strategy is itself a small **feedback controller** built from hysteresis bands (switch on below one threshold, off above another), which is the same idea a real thermostat uses.
 
 ## 14. Assumptions and limitations
 
@@ -514,6 +532,8 @@ A natural next step in the modelling cycle would be to **refine** any of these, 
 | `c_F` | food eaten | 0.075 kg/h |
 | `a, r` (ice) | first drill load, ratio | 3 L, 0.5 |
 | `λ` | failure rates | 0.01 to 0.02 per hour |
+| `C` | coal in the hopper | 0 to 12 kg |
+| `P_c, b` | coal generator power, burn rate | 3 kW, 1 kg/h |
 | `P0, q` | starting food price, price ratio per kg sold | 20 coins/kg, 0.9 |
 | `s` | food sold so far | kg |
 | `g_moon` | lunar gravity | 1.62 m/s² |

@@ -122,9 +122,11 @@ root
 |---|---|
 | `hour` | In-game hours since the meteor strike. |
 | `oxygen`, `energy`, `water`, `temperature`, `food` | The five resources (kg, kWh, L, °C, kg). |
-| `switches` | `{"solar", "oxygen", "water", "heater", "greenhouse"}` → on/off. These are the `uᵢ` terms of the equations. |
+| `switches` | `{"solar", "oxygen", "water", "heater", "greenhouse", "coal"}` → on/off. These are the `uᵢ` terms of the equations. |
+| `coal` | kg of coal in the coal generator's hopper. It is not one of the five survival resources (running out just stops the generator), but it is stepped with them. |
 | `failures` | Active failures by id, mapped to the hour they started. |
 | `ice_drills` | How many times each ice vein has been drilled. |
+| `coal_mined` | kg already dug out of each coal seam. |
 | `coins`, `food_sold` | The coin balance, and how many kg of food have been sold (which sets the market price). |
 | `history` | One snapshot of every resource per whole in-game hour. |
 | `running`, `ended`, `frozen`, `time_scale` | Clock control: paused, game over, calamity freeze, fast-forward multiplier. |
@@ -141,7 +143,7 @@ With `hours_per_second = 0.08`, one real second is 0.08 in-game hours (4.8 minut
 
 `step(dt)` does four things in order:
 
-1. **Euler update.** It asks `rates()` for every `dR/dt`, then adds `rate × dt` to each resource. Food is clamped to its pantry size (extra food spoils).
+1. **Euler update.** It asks `rates()` for every `dR/dt`, then adds `rate × dt` to each resource. Food is clamped to its pantry size (extra food spoils), and coal is clamped at zero.
 2. **Clock.** It advances `hour`. Each time a whole hour is crossed it appends a `history` entry and emits `hour_passed`.
 3. **Failures.** `_roll_failures(dt)` rolls the dice for each failure type that is not already active.
 4. **End check.** `_check_end()` ends the game if any resource has left its safe range (`game_over`), or if the rescue hour has arrived (`game_won`).
@@ -150,7 +152,7 @@ When `frozen` is true (set during a calamity), steps 1 and 3 are skipped: the cl
 
 ### The rate equations
 
-`rates_at(t, o, e, w, temp)` is the single function that implements the model. It returns a dictionary of five rates for any time and state, using the current switches and failures. `rates()` is just `rates_at` at the current state. Small helpers each compute one term:
+`rates_at(t, o, e, w, temp, coal)` is the single function that implements the model. It returns a dictionary of rates (the five resources plus coal) for any time and state, using the current switches and failures. `rates()` is just `rates_at` at the current state. Small helpers each compute one term:
 
 | Helper | Term |
 |---|---|
@@ -158,6 +160,7 @@ When `frozen` is true (set during a calamity), steps 1 and 3 are skipped: the cl
 | `sunlight(t)` | `S(t)`, a half sine wave |
 | `outside_temperature(t)` | `T_out(t)`, between −173 °C and 10 °C following the sunlight |
 | `solar_power(t)` | `η·A·S(t)`, cut by dust and zero when the panels are disconnected |
+| `coal_running(c)`, `coal_power(c)`, `coal_hours()` | `u_coal` (switched on **and** coal left), the generator's `P_c·u_coal`, and how long the hopper lasts `C/b` |
 | `power_draw()` | `Σ uᵢ·Pᵢ` |
 | `growth_factor(T)`, `crop_growth(T)` | the greenhouse's temperature curve `f(T)` and food output |
 
@@ -165,7 +168,7 @@ Because every other script (the forecast, the machine screens, the balance test)
 
 ### Forecasts and the survival clock
 
-`forecast()` copies the current state and runs the same Euler model ahead in steps of 0.2 h for up to 240 h, assuming the switches stay as they are and nothing new breaks. For each resource it records when it first crosses its min or max, interpolating inside the step for a smooth countdown, and whether it went out the top (`_forecast_hits_max`).
+`forecast()` copies the current state and runs the same Euler model ahead in steps of 0.2 h for up to 240 h, assuming the switches stay as they are and nothing new breaks. It also burns down a copy of the coal, so a forecast made with a nearly empty hopper sees the generator stop partway through. For each resource it records when it first crosses its min or max, interpolating inside the step for a smooth countdown, and whether it went out the top (`_forecast_hits_max`).
 
 Running 1,200 steps every frame would be wasteful, so `time_until_empty(resource)` caches the forecast and only recomputes it every 0.5 in-game hours. Between refreshes it subtracts the hours that have passed. Anything that changes the equations (a switch, a failure, a repair, a supply pod) calls `_invalidate_forecast()` so the next read recomputes straight away.
 
@@ -183,6 +186,7 @@ On top of that:
 | `trigger_failure(failure)` | Start a failure (used by the random roll and by calamities). |
 | `add_supplies(resource, amount)` | Add (or subtract) an amount directly, then check the limits. Used by pods and by drilling. |
 | `ice_load(vein)`, `ice_left(vein)`, `drill_ice(vein)` | The geometric-series ice veins. |
+| `mine_coal(seam)`, `coal_left(seam)` | Dig one load (2 kg) from a coal seam into the hopper, up to the hopper's 12 kg. |
 | `failure_rate()`, `failure_chance(t)` | The total Poisson rate and the chance of a breakdown within `t` hours, shown on the HUD. |
 | `food_price()`, `food_sale_value(kg)`, `sell_food(kg)` | The food market: the current price per kg, what a sale would pay, and the sale itself. |
 | `pod_price(kind)`, `buy_pod(kind)` | Pay coins for a supply pod (returns false if you can't afford it). |
@@ -197,7 +201,7 @@ At the end of each `_process`, `_push_to_hud()` finds the node in group `"hud"` 
 
 ## 5. All the numbers: `BaseConfig`
 
-`scripts/base_config.gd` declares a `Resource` class with one `@export` variable per constant, grouped by equation (Clock, Starting values, Safe ranges, Oxygen, Energy, Water, Temperature, Food, Ice mining, Trading, Day and night, Failures). Each group's heading is the equation it feeds, and each variable's comment gives its symbol and unit.
+`scripts/base_config.gd` declares a `Resource` class with one `@export` variable per constant, grouped by equation (Clock, Starting values, Safe ranges, Oxygen, Energy, Water, Temperature, Food, Ice mining, Trading, Coal, Day and night, Failures). Each group's heading is the equation it feeds, and each variable's comment gives its symbol and unit.
 
 `data/base_config.tres` is an instance of that class. It currently stores no overrides, so every value is the default written in the `.gd` file, but opening the `.tres` in the Godot inspector lets you rebalance the whole game with sliders without touching code.
 
@@ -218,7 +222,7 @@ Solar Array  ⇄  Moonbase  ⇄  Landing Pad
 - **Solar Array**: the solar panels (group `solar_panels`, cleaned of dust here) and the Greenhouse console.
 - **Moonbase**: a row of rooms (West Airlock, Solar Control, Oxygen Generator, Water Recycler, Heater, Habitat with the Control Panel, East Airlock). Each machine room has a `Console` node in group `system_consoles` with a `system` meta naming which switch it controls, and `on_texture`, `off_texture`, `broken_texture` metas for its art.
 - **Landing Pad**: the `ShipLandingPoint` where supply pods fall and the rescue ship lands, the TRADE terminal, and a `TunnelHatch` (group `hatches`).
-- **Ice Tunnels**: the shelter from calamities, with three ice veins (group `ice_veins`) and a ladder back up.
+- **Ice Tunnels**: the shelter from calamities, with three ice veins (group `ice_veins`), three coal seams (group `coal_seams`), the coal generator (a `system_consoles` node with `system = "coal"`), and a ladder back up.
 
 Coordinates use 32 pixels per metre (`Location.PIXELS_PER_METER`), with the ground surface at `y = 0`. When a location loads, `_regenerate_ground()` reshuffles which moon tile each ground cell uses (seeded per run and per scene), so the terrain looks different each game but the collision shape never changes.
 
@@ -254,9 +258,10 @@ The exit point is the airlock door on that side if the location has one (an `Air
   - At a **broken** machine (or any solar panel when the panels are dusty), holding E fills a repair bar over `repair_seconds` (2 s), then calls `Base.repair()`.
   - At a **working** machine, pressing E opens its `SystemPanel`.
   - At a **hatch**, E calls `main.travel()`.
+  - At a **coal seam**, holding E digs 2 kg straight into the generator's hopper (`Base.mine_coal`), blocked when the hopper is full. The prompt shows what each kilogram is worth: 1 h of burning at 3 kW, or 3 kWh.
   - At the **Control Panel**, the prompt shows the calamity status, and during a warning holding E packs a survival pack for the shelter (see [Calamities](#13-calamities)).
   - At an **ice vein**, holding E drills one load, showing the geometric-series formula with the real numbers. Drilling is blocked if the water would overflow the tank or the melt would flatten the battery, so a single press can never end the run.
-- **Updates visuals.** Machines swap between on, off and broken art (or tint when an art is missing). Ice veins fade as they empty. Solar panels turn brown when dusty.
+- **Updates visuals.** Machines swap between on, off and broken art (or tint when an art is missing). The coal generator's screen glows orange while it burns, and a toast fires when it runs out of coal. Ice veins and coal seams fade as they empty. Solar panels turn brown when dusty.
 - **Writes the alert banner.** For each failure, a line saying where to repair it. For each resource whose `time_until_empty` is under `warning_hours` (3 h), a line like "Water too low in 2h 10m: switch the water recycler on", with the hint chosen by whether it is heading too high or too low and by which failure is causing it.
 - **Fast-forward.** While F is held, `Base.time_scale = 6`. A new failure cancels fast-forward until F is pressed again, so nothing slips past.
 - **Juice.** A red vignette pulses while anything is wrong, and the camera shakes on failures and calamities. Short "toasts" announce failures, repairs, pods and calamities, and a line lists every pod still waiting.
@@ -266,11 +271,15 @@ On the end screen M opens the [math debrief](#14-rescue-the-end-screen-and-the-m
 
 The score is `10 × hours survived + 40 × repairs + 60 × pods collected + 1000 if rescued`.
 
+### The coal generator
+
+Coal is a second power source for the night. The generator sits in the Ice Tunnels next to three seams of 8 kg each. Switched on at its console, it adds `P_c = 3 kW` to the battery and burns `b = 1 kg/h` from its 12 kg hopper; when the hopper empties, `u_coal` drops to 0 by itself and the generator stops. The HUD's systems panel lists it as "Coal gen", showing +3.0 kW while it burns or the kg left in the hopper while it doesn't, and the net power includes it. Coal and the seams' progress are saved with the run.
+
 ## 9. Machine screens: `SystemPanel`
 
 Pressing E at a working console creates a `SystemPanel` (`scripts/system_panel.gd`), a `CanvasLayer` that pauses the game and shows:
 
-- **The equation** for that system with today's numbers substituted, built in `_equation_text()` as BBCode. For example the heater screen shows `dT/dt = [H·u_heat − k·(T − T_out)] / C` and then the same line with `2.5`, `0.012`, the current cabin and outside temperatures and the resulting °C/h.
+- **The equation** for that system with today's numbers substituted, built in `_equation_text()` as BBCode. The coal generator's screen shows `dC/dt = −b·u_coal`, how long the hopper lasts (`C/b`), the power it adds, and the battery equation with the coal term. For example the heater screen shows `dT/dt = [H·u_heat − k·(T − T_out)] / C` and then the same line with `2.5`, `0.012`, the current cabin and outside temperatures and the resulting °C/h.
 - **A legend** of every symbol (`_symbol_text()`).
 - **An ON/OFF button** (Space or Enter), which calls `Base.toggle_system()`.
 - **A what-if table and graph.** `_simulate(on)` temporarily forces the switch on or off, runs `Base.rates_at` forward in 0.1 h steps for up to 96 h, and restores the switch. It returns the primary resource's curve over the next 24 h, the rates right now, and when each resource would hit a limit. The screen runs it twice, once ON and once OFF, and shows both side by side so the player can see the consequence of the switch before making it. The graph (`WhatIfGraph`) draws both curves over the safe-range band, with the current choice thicker.
@@ -383,6 +392,7 @@ It creates a `Base` with a fixed seed and plays the full 72 hours in steps of 0.
 - **Add a sound:** build it in `Sfx._build_sounds()` with `_tone` or `_noise`, then `Sfx.play("name")` or connect it to a signal in `Sfx._ready()`.
 - **Rebalance the game:** edit `data/base_config.tres` in the inspector (or the defaults in `scripts/base_config.gd`), then run the balance test.
 - **Add a resource:** add it to `Base.RESOURCES`, give it a variable, `_min`/`_max` and a start value in `BaseConfig`, a rate in `rates_at`, and a row in the HUD's `CONFIG`.
+- **Change coal:** the Coal group of `BaseConfig` (`coal_generator_power`, `coal_burn_rate`, `coal_max`, `coal_per_seam`, `coal_per_pass`).
 - **Add a switchable machine:** add it to `Base.SYSTEMS` and `switches`, give it a `*_running()` helper and a term in `rates_at` / `power_draw`, then place a `Console` node with a matching `system` meta in a location scene.
 - **Add a failure:** add it to `config.failure_rates`, `Base.FAILURE_SITES` and `FAILURE_NAMES`, and make `rates_at` check `failures.has("<id>")`.
 - **Add a location:** make a scene whose root uses `location.gd`, set its exits, and point a neighbour's exit at it.
