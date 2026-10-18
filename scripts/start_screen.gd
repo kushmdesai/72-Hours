@@ -91,7 +91,7 @@ func _build() -> void:
 		16, Color(0.55, 0.65, 0.75)))
 	_hint = _label("Press Enter to start", 26, Color.WHITE)
 	box.add_child(_label("New here? Press T for a short tutorial", 20, Color(1.0, 0.75, 0.3)))
-	box.add_child(_label("L  load a saved game      Esc / P  pause, save and load during play", 15, Color(0.6, 0.66, 0.76)))
+	box.add_child(_label("L  load a saved game      Esc / P  pause, save and load during play      N  sound on/off", 15, Color(0.6, 0.66, 0.76)))
 	box.add_child(_hint)
 
 

@@ -26,6 +26,7 @@ var _was_on_floor := true
 var _air_time := 0.0
 var _step_px := 0.0
 var _hum: AudioStreamPlayer
+var _notice: Label
 
 
 func _ready() -> void:
@@ -40,13 +41,14 @@ func _ready() -> void:
 	_hum.volume_db = -26.0
 	add_child(_hum)
 	_hum.play()
+	_build_notice()
 
 	Base.system_toggled.connect(func(_s, on): play("switch_on" if on else "switch_off"))
 	Base.failure_started.connect(func(_f): play("alarm"))
 	Base.failure_repaired.connect(func(_f): play("repaired"))
 	Base.game_over.connect(func(_r, _h, _hi): _end_sound("game_over"))
 	Base.game_won.connect(func(): _end_sound("win"))
-	Base.supplies_added.connect(func(_r, _a): play("pickup"))
+	Base.supplies_added.connect(_on_supplies_added)
 	# Coins arrived later than the rest of Base, so hook them up only if present.
 	if Base.has_signal("coins_changed"):
 		_last_coins = Base.get("coins")
@@ -68,6 +70,11 @@ func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 func set_muted(on: bool) -> void:
 	muted = on
 	AudioServer.set_bus_mute(0, on)
+	_notice.text = "Sound off  (N)" if on else "Sound on  (N)"
+	var tween := create_tween()
+	_notice.modulate.a = 1.0
+	tween.tween_interval(1.0)
+	tween.tween_property(_notice, "modulate:a", 0.0, 0.5)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,6 +85,19 @@ func _unhandled_input(event: InputEvent) -> void:
 func _end_sound(sound: String) -> void:
 	_hum.stop()
 	play(sound)
+
+
+## Pods, ice and coal all arrive through add_supplies; the battery drain of
+## melting ice comes through as a negative amount and stays silent.
+func _on_supplies_added(resource: String, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	if resource == "coal":
+		play("dig")
+	elif resource == "water":
+		play("splash")
+	else:
+		play("pickup")
 
 
 func _on_coins_changed(coins: float) -> void:
@@ -100,6 +120,8 @@ func _on_node_added(node: Node) -> void:
 		node.arrived.connect(func(): play("rumble"))
 		node.passed.connect(func(): play("all_clear"))
 		node.caught.connect(func(): _end_sound("game_over"))
+		node.shutdown_started.connect(func(): play("power_down"))
+		node.shelter_stocked.connect(func(_h): play("stow"))
 	elif node is SupplyDrops:
 		node.pod_landed.connect(func(_p): play("thud"))
 	elif node is Player:
@@ -133,6 +155,24 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = on_floor
 
 
+## A small "Sound on/off" note in the top-right corner when N is pressed.
+func _build_notice() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	add_child(layer)
+	_notice = Label.new()
+	_notice.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_notice.offset_left = -220.0
+	_notice.offset_right = -16.0
+	_notice.offset_top = 12.0
+	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_notice.add_theme_font_size_override("font_size", 18)
+	_notice.add_theme_color_override("font_outline_color", Color.BLACK)
+	_notice.add_theme_constant_override("outline_size", 6)
+	_notice.modulate.a = 0.0
+	layer.add_child(_notice)
+
+
 # --- Synthesis -------------------------------------------------------------
 
 func _build_sounds() -> void:
@@ -155,6 +195,10 @@ func _build_sounds() -> void:
 	_sounds.step = _noise(0.07, 0.5, 0.001, 0.02, 0.8)
 	_sounds.game_over = _tone([[392, 392, 0.3], [330, 330, 0.3], [262, 262, 0.3], [196, 110, 0.9]], "triangle", 0.5, 0.01, 0.6)
 	_sounds.win = _tone([[523, 523, 0.15], [659, 659, 0.15], [784, 784, 0.15], [1047, 1047, 0.5]], "square", 0.25, 0.005, 0.4)
+	_sounds.power_down = _tone([[600, 80, 0.9]], "saw", 0.25, 0.01, 0.6)
+	_sounds.stow = _tone([[330, 330, 0.06], [494, 494, 0.12]], "triangle", 0.4, 0.003, 0.08)
+	_sounds.dig = _noise(0.22, 0.6, 0.001, 0.07, 0.6)
+	_sounds.splash = _noise(0.35, 0.4, 0.01, 0.12, 0.3)
 	_sounds.hum = _hum_loop()
 
 
