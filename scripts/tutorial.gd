@@ -18,6 +18,8 @@ const CLOCK_HOURS := 1.5
 ## The door between the Habitat and the Heater room, and its x if not found.
 const DOOR_NODE := "RoomDoors/HeaterHabitat"
 const DOOR_X := 1936.0
+const PAD := "res://scenes/locations/landing_pad.tscn"
+const TUNNELS := "res://scenes/locations/tunnels.tscn"
 
 const COLOR_TEXT := Color(0.88, 0.92, 1.0)
 const COLOR_DIM := Color(0.6, 0.66, 0.76)
@@ -46,10 +48,36 @@ const STEPS := [
 		"text": "The clock is stopped for this tutorial. Hold F to fast-forward and watch the bars and rates change."},
 	{"id": "repair", "title": "REPAIRS",
 		"text": "Alarm! The heater has broken and flashes red. Machines break at random during a run.\nStand at the heater and hold E until the repair bar fills."},
-	{"id": "more", "title": "BEYOND THE BASE", "next": true,
-		"text": "Walk out through the airlocks to explore. The Landing Pad has a trade terminal: sell greenhouse food for coins (the price falls as you sell) and spend them on supply pods.\nThe ice tunnels under the base hold ice to drill for water and coal seams to dig for the coal generator, which keeps the battery up at night."},
-	{"id": "end", "title": "CALAMITIES", "next": true,
-		"text": "The Control Panel in the Habitat warns you hours before a calamity. While it warns, hold E there to pack survival packs and carry them down to the ice tunnels, then shelter there until it passes.\nKeep every bar inside its limits for 72 hours and board the rescue ship on the Landing Pad. Good luck!"},
+	{"id": "to_pad", "title": "THE LANDING PAD",
+		"text": "Time to go outside. Walk right, through the Habitat and out of the East Airlock, to the Landing Pad."},
+	{"id": "sell", "title": "COINS: SELLING FOOD",
+		"text": "The trade terminal is on the left of the pad. The market pays p(s) = 20 · 0.9ˢ coins per kg after s kg sold, so every kilogram is worth 10% less than the last, and a sale pays the area under that curve.\nWalk to the terminal, press E and click Sell 2.0 kg."},
+	{"id": "buy", "title": "COINS: SUPPLY PODS",
+		"text": "Coins buy supply pods: oxygen, water, food, or a toolkit that fixes everything. A food pod costs 25 coins and puts back what you sold.\nClick Food pod to order one."},
+	{"id": "catch", "title": "CATCHING A POD",
+		"text": "Your pod is parachuting onto the pad. Pods hang in the air, so you need a moon jump to reach them. Free pods also fall here every few hours during a run.\nClose the screen with E, then jump into the pod to collect it."},
+	{"id": "hatch", "title": "THE ICE TUNNELS",
+		"text": "Under the base are the ice tunnels: water ice, coal, and the only shelter from a calamity.\nWalk right to the hatch and press E to climb down."},
+	{"id": "coal_dig", "title": "COAL",
+		"text": "The dark rock past the Coal Generator is a coal seam.\nWalk right to it and hold E to dig coal into the generator's hopper."},
+	{"id": "coal_on", "title": "THE COAL GENERATOR",
+		"text": "Coal powers the battery when the sun is down. Burning at b = 1 kg/h it adds 3 kW, so the hopper's C kg lasts C/b hours (dC/dt = −b·u).\nWalk back to the Coal Generator, press E and switch it ON."},
+	{"id": "close_coal", "title": "THE COAL GENERATOR",
+		"text": "The battery's equation now has a +3 kW term while the coal lasts.\nPress E or Esc to close the screen."},
+	{"id": "ice", "title": "ICE",
+		"text": "The blue crystals are an ice vein. Each pass of the drill brings r times the last load, a geometric series, so a vein holds a/(1 − r) litres in all. Melting it costs battery.\nWalk right to the ice and hold E to drill water."},
+	{"id": "drill", "title": "CALAMITY DRILL", "next": true,
+		"text": "About once a day a calamity strikes: a black hole, an alien UFO raid or an asteroid shower. Anyone on the surface dies, and the machines get damaged.\nThe Control Panel in the Habitat warns 6 hours ahead. Press Enter to start an asteroid shower drill."},
+	{"id": "pack", "title": "PACK SUPPLIES",
+		"text": "The base shuts down while it passes, so you live off what you bring. It lasts 2 hours, and each pack holds 1 hour of air, water and food, so take three to be safe.\nClimb the ladder, go back into the Moonbase to the Control Panel in the Habitat and hold E to pack three times."},
+	{"id": "carry", "title": "TAKE SHELTER",
+		"text": "Now carry the packs down to the ice tunnels. They are unpacked into the shelter as soon as you arrive.\nGo back out to the Landing Pad and down the hatch."},
+	{"id": "wait", "title": "RIDE IT OUT",
+		"text": "An hour before it hits, the base shuts down: resources freeze, machines ice over and you move at quarter speed. Stay down here until it passes.\nHold F to fast-forward (press it again if an alarm stops it)."},
+	{"id": "after", "title": "AFTERMATH", "next": true,
+		"text": "You survived the shower, but it broke machines. The red list above the HUD says where to repair each one: hold E there as you did with the heater, or buy a toolkit pod to fix everything at once."},
+	{"id": "end", "title": "READY", "next": true,
+		"text": "That's the whole game. Keep every bar inside its limits for 72 hours, then board the rescue ship on the Landing Pad.\nEsc pauses, saves and loads. After a run, press M on the end screen for a math debrief: graphs and equations of how your resources changed."},
 ]
 
 var _step := -1
@@ -60,6 +88,9 @@ var _walked := 0.0
 var _last_x := 0.0
 var _airborne := false
 var _clock_start := 0.0
+## Coins when the current step began, to see a sale or a purchase.
+var _coins_mark := 0.0
+var _controller: Node
 var _panel_open := false
 var _blink := 0.0
 
@@ -82,6 +113,17 @@ func _ready() -> void:
 	Base.running = false
 	Base.system_toggled.connect(_on_system_toggled)
 	Base.failure_repaired.connect(_on_failure_repaired)
+	Base.supplies_added.connect(_on_supplies_added)
+	# The trade screen pauses the game, so sales are caught by signal.
+	Base.coins_changed.connect(_on_coins_changed)
+	_controller = get_tree().get_first_node_in_group("systems_controller")
+	_drops().pod_collected.connect(func(_pod: Dictionary) -> void:
+		if _id() == "catch":
+			_go(_step + 1))
+	_dangers().passed.connect(func() -> void:
+		if _id() == "wait":
+			Base.running = false
+			_go(_step + 1))
 	get_tree().node_added.connect(_on_node_added)
 	_build()
 	# After main.gd has put the player at the start marker.
@@ -119,6 +161,26 @@ func _process(delta: float) -> void:
 			if Base.hour - _clock_start >= CLOCK_HOURS:
 				Base.running = false
 				_go(_step + 1)
+		"to_pad":
+			if _at(PAD):
+				_go(_step + 1)
+		"hatch":
+			if _at(TUNNELS):
+				_go(_step + 1)
+		"coal_dig":
+			if Base.coal > 0.0:
+				_go(_step + 1)
+		"pack":
+			var d := _dangers()
+			# One spare pack: exactly enough can run out in the last minutes.
+			if d.hours_of(d.carried) + d.hours_of(d.shelter) >= d.duration_hours + d.pack_hours - 0.01:
+				_go(_step + 1)
+		"carry":
+			var d := _dangers()
+			if d.sheltered() and d.hours_of(d.shelter) >= d.duration_hours + d.pack_hours - 0.01:
+				_go(_step + 1)
+		"wait":
+			Base.running = true
 	_last_x = x
 
 
@@ -170,29 +232,66 @@ func _go(step: int) -> void:
 			_clock_start = Base.hour
 		"repair":
 			Base.trigger_failure("heater_fault")
+		"sell", "buy":
+			_coins_mark = Base.coins
+		"close_coal":
+			if not _panel_open:
+				_go.call_deferred(step + 1)
+		"pack":
+			# An asteroid shower 4 h away: inside the 6 h warning, so the
+			# Control Panel lets the player pack straight away.
+			var d := _dangers()
+			d.kind = "asteroids"
+			d.arrive_hour = Base.hour + 4.0
 	_card.modulate.a = 0.0
 	create_tween().tween_property(_card, "modulate:a", 1.0, 0.25)
 
 
 func _on_node_added(node: Node) -> void:
-	if node is SystemPanel:
+	if node is SystemPanel or node is TradePanel:
 		_panel_open = true
 		node.tree_exited.connect(_on_panel_closed)
-		if _id() == "open" and node.site == "heater":
+		if _id() == "open" and node is SystemPanel and node.site == "heater":
 			_go(_step + 1)
 
 
 func _on_panel_closed() -> void:
 	_panel_open = false
-	if _id() == "close":
+	if _id() in ["close", "close_coal"]:
 		_go(_step + 1)
 	elif _id() == "switch":
 		_go(_step - 1)
 
 
-func _on_system_toggled(system: String, _on: bool) -> void:
+func _on_system_toggled(system: String, on: bool) -> void:
 	if _id() == "switch" and system == "heater":
 		_go(_step + 1)
+	elif _id() == "coal_on" and system == "coal" and on:
+		_go(_step + 1)
+
+
+func _on_supplies_added(resource: String, amount: float) -> void:
+	if _id() == "ice" and resource == "water" and amount > 0.0:
+		_go(_step + 1)
+
+
+func _on_coins_changed(coins: float) -> void:
+	if (_id() == "sell" and coins > _coins_mark + 0.01) \
+			or (_id() == "buy" and coins < _coins_mark - 0.01):
+		_go(_step + 1)
+
+
+## True if the player is in the location at this scene path.
+func _at(path: String) -> bool:
+	return _main.current != null and _main.current.scene_file_path == path
+
+
+func _drops() -> SupplyDrops:
+	return _controller.get("_drops")
+
+
+func _dangers() -> DangerEvents:
+	return _controller.get("_dangers")
 
 
 func _on_failure_repaired(_failure: String) -> void:
@@ -216,6 +315,8 @@ func _finish() -> void:
 ## the part of the screen being explained.
 func _layout() -> void:
 	_card.visible = not _panel_open
+	# Sit below the calamity banner along the top while it shows.
+	_card.offset_top = maxf(12.0, _dangers().banner_bottom() + 8.0)
 	_banner.visible = _panel_open
 	if _panel_open:
 		_banner.text = _body.text.get_slice("\n", _body.text.get_slice_count("\n") - 1)
