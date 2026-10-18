@@ -91,12 +91,12 @@ extends Resource
 ## c_F: astronaut food use, 1.8 kg/day.
 @export var food_use: float = 0.075
 ## y: greenhouse crop yield in kg/h at the best temperature.
-@export var crop_yield: float = 0.18
+@export var crop_yield: float = 0.3
 ## T_opt: cabin temperature the crop grows best at.
 @export var crop_best_temperature: float = 23.0
 ## T_span: growth falls to zero this many °C either side of T_opt, following
 ## f(T) = max(0, 1 - ((T - T_opt)/T_span)^2).
-@export var crop_temperature_span: float = 14.0
+@export var crop_temperature_span: float = 20.0
 ## p: kg of oxygen the plants give off per kg of food grown (photosynthesis).
 @export var crop_oxygen: float = 0.08
 ## w_gh: water the plants drink and breathe out in L/h while the greenhouse is on.
@@ -156,7 +156,7 @@ extends Resource
 	"generator_jam": 0.012,
 	"water_leak": 0.012,
 	"heater_fault": 0.01,
-	"blight": 0.01,
+	"blight": 0.006,
 }
 ## No failures in the first few hours so the player can learn the controls.
 @export var failure_grace_hours: float = 4.0
