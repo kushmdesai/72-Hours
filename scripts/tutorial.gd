@@ -26,58 +26,65 @@ const COLOR_DIM := Color(0.6, 0.66, 0.76)
 const COLOR_ACCENT := Color(1.0, 0.78, 0.35)
 const COLOR_DONE := Color(0.4, 0.9, 0.55)
 
-## id: what to check; text: the task; next: true if Enter moves on.
+## The four parts of the tutorial, shown on the card.
+const PARTS := ["", "THE BASE", "THE LANDING PAD", "THE ICE TUNNELS", "SURVIVING A CALAMITY"]
+const MISSION := "Mission: keep all five resources in their safe range for 72 hours, then board the rescue ship."
+
+## id: what to check; part: which PARTS it belongs to; why: how it helps you
+## survive; text: the task; next: true if Enter moves on.
 const STEPS := [
-	{"id": "walk", "title": "MOVING",
+	{"id": "goal", "part": 0, "title": "YOUR MISSION", "next": true,
+		"text": "A meteor has crippled your moonbase and you are the only one awake. A rescue ship lands in 72 hours.\nUntil then, keep oxygen, battery, water, temperature and food between their safe limits. If any one crosses a limit, the run is over. When the ship lands, board it on the Landing Pad to win.\nThis tutorial teaches the tools for that in four parts: the base, the Landing Pad, the ice tunnels and surviving a calamity. Press Enter to begin."},
+	{"id": "walk", "part": 1, "why": "You'll be running between machines all game.", "title": "MOVING",
 		"text": "Walk left and right with A and D (or the arrow keys).\nLow gravity means less grip, so you take a moment to speed up and to stop."},
-	{"id": "jump", "title": "JUMPING",
+	{"id": "jump", "part": 1, "why": "Supply pods hang in the air, so you need a jump to grab them.", "title": "JUMPING",
 		"text": "Press W or Space to jump.\nThe Moon pulls at 1.62 m/s², about a sixth of Earth's, so a jump rises about 3 m and floats for nearly 4 s (h = v₀²/2g, t = 2v₀/g)."},
-	{"id": "door", "title": "DOORS",
+	{"id": "door", "part": 1, "why": "Each machine sits in its own room, joined by these doors.", "title": "DOORS",
 		"text": "Rooms are joined by hydraulic doors that slide open as you walk up to them.\nWalk left through the door into the Heater room."},
-	{"id": "open", "title": "MACHINE SCREENS",
+	{"id": "open", "part": 1, "why": "Machine screens are where you control the base.", "title": "MACHINE SCREENS",
 		"text": "Each room has a machine. Stand in front of the heater and press E to open its screen."},
-	{"id": "switch", "title": "ON / OFF",
+	{"id": "switch", "part": 1, "why": "Switching machines on and off is how you steer every resource.", "title": "ON / OFF",
 		"text": "The screen shows the heater's equation with today's numbers, and a what-if graph of the next 24 h with it ON and OFF.\nPress Space or Enter (or click the button) to switch it ON."},
-	{"id": "close", "title": "ON / OFF",
+	{"id": "close", "part": 1, "why": "Switching machines on and off is how you steer every resource.", "title": "ON / OFF",
 		"text": "The heater is on now: its uᵢ term in the equation went from 0 to 1.\nPress E or Esc to close the screen."},
-	{"id": "bars", "title": "RESOURCES", "next": true,
+	{"id": "bars", "part": 1, "why": "These bars decide whether you win or lose: watch them all game.", "title": "RESOURCES", "next": true,
 		"text": "The bars along the bottom are your five resources: oxygen, battery, water, temperature and food.\nThe red ends are the safe limits. Cross one and the run is over. Under each bar is its rate per hour and how long until it reaches a limit."},
-	{"id": "systems", "title": "SYSTEMS AND CLOCKS", "next": true,
+	{"id": "systems", "part": 1, "why": "Power is limited: every machine you run drains the battery.", "title": "SYSTEMS AND CLOCKS", "next": true,
 		"text": "Top left lists every machine, whether it is on and the power it draws against what the solar panels make. Beside it are your coins.\nBottom right, YOU LAST compares how long the base can hold out with the 72 hours until the rescue ship lands."},
-	{"id": "clock", "title": "TIME",
+	{"id": "clock", "part": 1, "why": "Fast-forward skips quiet stretches. It stops by itself when something breaks.", "title": "TIME",
 		"text": "The clock is stopped for this tutorial. Hold F to fast-forward and watch the bars and rates change."},
-	{"id": "repair", "title": "REPAIRS",
+	{"id": "repair", "part": 1, "why": "A broken machine stops working until you fix it.", "title": "REPAIRS",
 		"text": "Alarm! The heater has broken and flashes red. Machines break at random during a run.\nStand at the heater and hold E until the repair bar fills."},
-	{"id": "to_pad", "title": "THE LANDING PAD",
+	{"id": "to_pad", "part": 2, "why": "Trading, supply pods and the rescue ship are all on the pad.", "title": "THE LANDING PAD",
 		"text": "Time to go outside. Walk right, through the Habitat and out of the East Airlock, to the Landing Pad."},
-	{"id": "sell", "title": "COINS: SELLING FOOD",
+	{"id": "sell", "part": 2, "why": "Coins buy whatever the base is running short of.", "title": "COINS: SELLING FOOD",
 		"text": "The trade terminal is on the left of the pad. The market pays p(s) = 20 · 0.9ˢ coins per kg after s kg sold, so every kilogram is worth 10% less than the last, and a sale pays the area under that curve.\nWalk to the terminal, press E and click Sell 2.0 kg."},
-	{"id": "buy", "title": "COINS: SUPPLY PODS",
+	{"id": "buy", "part": 2, "why": "Coins buy whatever the base is running short of.", "title": "COINS: SUPPLY PODS",
 		"text": "Coins buy supply pods: oxygen, water, food, or a toolkit that fixes everything. A food pod costs 25 coins and puts back what you sold.\nClick Food pod to order one."},
-	{"id": "catch", "title": "CATCHING A POD",
+	{"id": "catch", "part": 2, "why": "A pod only counts once you collect it.", "title": "CATCHING A POD",
 		"text": "Your pod is parachuting onto the pad. Pods hang in the air, so you need a moon jump to reach them. Free pods also fall here every few hours during a run.\nClose the screen with E, then jump into the pod to collect it."},
-	{"id": "hatch", "title": "THE ICE TUNNELS",
+	{"id": "hatch", "part": 3, "why": "The tunnels hold extra water, fuel and your only shelter.", "title": "THE ICE TUNNELS",
 		"text": "Under the base are the ice tunnels: water ice, coal, and the only shelter from a calamity.\nWalk right to the hatch and press E to climb down."},
-	{"id": "coal_dig", "title": "COAL",
+	{"id": "coal_dig", "part": 3, "why": "Solar panels make nothing at night. Coal keeps the battery up.", "title": "COAL",
 		"text": "The dark rock past the Coal Generator is a coal seam.\nWalk right to it and hold E to dig coal into the generator's hopper."},
-	{"id": "coal_on", "title": "THE COAL GENERATOR",
+	{"id": "coal_on", "part": 3, "why": "Solar panels make nothing at night. Coal keeps the battery up.", "title": "THE COAL GENERATOR",
 		"text": "Coal powers the battery when the sun is down. Burning at b = 1 kg/h it adds 3 kW, so the hopper's C kg lasts C/b hours (dC/dt = −b·u).\nWalk back to the Coal Generator, press E and switch it ON."},
-	{"id": "close_coal", "title": "THE COAL GENERATOR",
+	{"id": "close_coal", "part": 3, "why": "Solar panels make nothing at night. Coal keeps the battery up.", "title": "THE COAL GENERATOR",
 		"text": "The battery's equation now has a +3 kW term while the coal lasts.\nPress E or Esc to close the screen."},
-	{"id": "ice", "title": "ICE",
+	{"id": "ice", "part": 3, "why": "Ice tops up the water tank when it runs low.", "title": "ICE",
 		"text": "The blue crystals are an ice vein. Each pass of the drill brings r times the last load, a geometric series, so a vein holds a/(1 − r) litres in all. Melting it costs battery.\nWalk right to the ice and hold E to drill water."},
-	{"id": "drill", "title": "CALAMITY DRILL", "next": true,
+	{"id": "drill", "part": 4, "why": "Calamities are the biggest danger in a run.", "title": "CALAMITY DRILL", "next": true,
 		"text": "About once a day a calamity strikes: a black hole, an alien UFO raid or an asteroid shower. Anyone on the surface dies, and the machines get damaged.\nThe Control Panel in the Habitat warns 6 hours ahead. Press Enter to start an asteroid shower drill."},
-	{"id": "pack", "title": "PACK SUPPLIES",
-		"text": "The base shuts down while it passes, so you live off what you bring. It lasts 2 hours, and each pack holds 1 hour of air, water and food, so take three to be safe.\nClimb the ladder, go back into the Moonbase to the Control Panel in the Habitat and hold E to pack three times."},
-	{"id": "carry", "title": "TAKE SHELTER",
+	{"id": "pack", "part": 4, "why": "The base is shut down while it passes, so you live off what you pack.", "title": "PACK SUPPLIES",
+		"text": "The base shuts down while it passes, so you live off what you bring. It lasts 2 hours, and each pack holds 1 hour of air, water and food, so you need two.\nClimb the ladder, go back into the Moonbase to the Control Panel in the Habitat and hold E to pack twice."},
+	{"id": "carry", "part": 4, "why": "Being on the surface when it hits ends the run.", "title": "TAKE SHELTER",
 		"text": "Now carry the packs down to the ice tunnels. They are unpacked into the shelter as soon as you arrive.\nGo back out to the Landing Pad and down the hatch."},
-	{"id": "wait", "title": "RIDE IT OUT",
+	{"id": "wait", "part": 4, "why": "Resources freeze during the shutdown, so the base waits for you.", "title": "RIDE IT OUT",
 		"text": "An hour before it hits, the base shuts down: resources freeze, machines ice over and you move at quarter speed. Stay down here until it passes.\nHold F to fast-forward (press it again if an alarm stops it)."},
-	{"id": "after", "title": "AFTERMATH", "next": true,
+	{"id": "after", "part": 4, "why": "Damaged machines stay broken until you repair them.", "title": "AFTERMATH", "next": true,
 		"text": "You survived the shower, but it broke machines. The red list above the HUD says where to repair each one: hold E there as you did with the heater, or buy a toolkit pod to fix everything at once."},
-	{"id": "end", "title": "READY", "next": true,
-		"text": "That's the whole game. Keep every bar inside its limits for 72 hours, then board the rescue ship on the Landing Pad.\nEsc pauses, saves and loads. After a run, press M on the end screen for a math debrief: graphs and equations of how your resources changed."},
+	{"id": "end", "part": 4, "title": "READY", "next": true,
+		"text": "That's the whole game. Your mission: keep every bar inside its limits for 72 hours, then board the rescue ship on the Landing Pad.\nEsc pauses, saves and loads. After a run, press M on the end screen for a math debrief: graphs and equations of how your resources changed."},
 ]
 
 var _step := -1
@@ -98,6 +105,9 @@ var _card: PanelContainer
 var _title: Label
 var _counter: Label
 var _body: Label
+var _part: Label
+var _why: Label
+var _mission: Label
 var _footer: Label
 var _banner: Label
 var _highlight: Control
@@ -172,12 +182,11 @@ func _process(delta: float) -> void:
 				_go(_step + 1)
 		"pack":
 			var d := _dangers()
-			# One spare pack: exactly enough can run out in the last minutes.
-			if d.hours_of(d.carried) + d.hours_of(d.shelter) >= d.duration_hours + d.pack_hours - 0.01:
+			if d.hours_of(d.carried) + d.hours_of(d.shelter) >= d.duration_hours - 0.01:
 				_go(_step + 1)
 		"carry":
 			var d := _dangers()
-			if d.sheltered() and d.hours_of(d.shelter) >= d.duration_hours + d.pack_hours - 0.01:
+			if d.sheltered() and d.hours_of(d.shelter) >= d.duration_hours - 0.01:
 				_go(_step + 1)
 		"wait":
 			Base.running = true
@@ -212,7 +221,11 @@ func _go(step: int) -> void:
 	var s: Dictionary = STEPS[step]
 	_title.text = s.title
 	_counter.text = "%d / %d" % [step + 1, STEPS.size()]
+	_part.text = "PART %d OF 4 · %s" % [s.part, PARTS[s.part]] if s.part > 0 else "MOONBASE: 72 HOURS"
 	_body.text = s.text
+	_why.text = "Why: " + s.why if s.has("why") else ""
+	_why.visible = s.has("why")
+	_mission.visible = s.id != "goal"
 	if s.get("next", false):
 		_footer.text = "Enter: " + ("back to the title screen" if step == STEPS.size() - 1 else "next") \
 				+ "     Q: leave the tutorial"
@@ -368,6 +381,8 @@ func _build() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	_card.add_child(box)
+	_part = _label("", 12, COLOR_DIM)
+	box.add_child(_part)
 	var header := HBoxContainer.new()
 	box.add_child(header)
 	_title = _label("", 18, COLOR_ACCENT)
@@ -379,6 +394,15 @@ func _build() -> void:
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.custom_minimum_size.x = 400.0
 	box.add_child(_body)
+	_why = _label("", 14, COLOR_DONE)
+	_why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_why.custom_minimum_size.x = 400.0
+	box.add_child(_why)
+	# The goal stays on the card at every step.
+	_mission = _label(MISSION, 13, COLOR_ACCENT)
+	_mission.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mission.custom_minimum_size.x = 400.0
+	box.add_child(_mission)
 	_footer = _label("", 12, COLOR_DIM)
 	box.add_child(_footer)
 
