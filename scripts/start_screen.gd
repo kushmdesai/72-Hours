@@ -3,7 +3,8 @@ extends CanvasLayer
 ## Title screen shown when the game first launches. It pauses the game (so the
 ## Base model's clock doesn't run) until the player presses Enter, Space or clicks.
 ## Restarting with R after an ending skips it and goes straight back in.
-## L opens the Load page of the GameMenu over it.
+## L opens the Load page of the GameMenu over it, and T starts the tutorial
+## (scripts/tutorial.gd).
 
 ## True once the player has started a run, so scene reloads don't show it again.
 static var started := false
@@ -36,6 +37,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		menu.open_load_from_title()
 		return
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.physical_keycode == KEY_T:
+		get_viewport().set_input_as_handled()
+		_start_tutorial()
+		return
 	var pressed := event.is_action_pressed("ui_accept")
 	if event is InputEventMouseButton and event.pressed:
 		pressed = true
@@ -48,6 +54,15 @@ func _start() -> void:
 	started = true
 	get_tree().paused = false
 	queue_free()
+
+
+## Reload the game with the tutorial guide on top (main.gd adds it).
+func _start_tutorial() -> void:
+	started = true
+	Tutorial.active = true
+	get_tree().paused = false
+	Base.reset()
+	get_tree().reload_current_scene()
 
 
 func _build() -> void:
@@ -75,6 +90,7 @@ func _build() -> void:
 		"A / D  move     W  jump     E  open a console / hold to repair     F  fast-forward",
 		16, Color(0.55, 0.65, 0.75)))
 	_hint = _label("Press Enter to start", 26, Color.WHITE)
+	box.add_child(_label("New here? Press T for a short tutorial", 20, Color(1.0, 0.75, 0.3)))
 	box.add_child(_label("L  load a saved game      Esc / P  pause, save and load during play", 15, Color(0.6, 0.66, 0.76)))
 	box.add_child(_hint)
 

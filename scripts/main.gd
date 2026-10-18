@@ -22,6 +22,8 @@ func _ready() -> void:
 	add_child(SystemsController.new())
 	add_child(StartScreen.new())
 	add_child(GameMenu.new())
+	if Tutorial.active:
+		add_child(Tutorial.new())
 	_enter(start_location)
 	var start := current.get_node_or_null("PlayerStart") as Node2D
 	if start:
